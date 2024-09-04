@@ -1,19 +1,21 @@
 <template>
-  <div>
-    <a href="">refresh</a>
-    <!-- <pre>motor.models: {{ motor.models }}</pre> -->
-    <pre>motor.loadingManager: {{ motor.loadingManager }}</pre>
+  <nuxt-layout name="main">
     <div
       ref="canvasRef"
       id="app-index"
-      style="width: 100%; height: 100vh"
+      style="width: 100%; height: 400px"
       @click="
         () => {
           motor.pointerLock.lock();
         }
       "
     ></div>
-  </div>
+    <a href="">refresh</a>
+    <!-- <pre>motor.models: {{ motor.models }}</pre> -->
+    <pre>motor.loadingManager: {{ motor.loadingManager }}</pre>
+    <pre>motor.cameraMove: {{ motor.cameraMove }}</pre>
+    <pre>motor.size: {{ motor.size }}</pre>
+  </nuxt-layout>
 </template>
 
 <script setup>
@@ -24,54 +26,71 @@ const motor = useThreeMotor({
       url: "/assets/threejs/models/low-poly-level/scene.gltf",
       onLoad(scope) {
         scope.scene.add(scope.gltf.scene);
+        scope.physics.add.existing(scope.gltf.scene, {
+          mass: 0,
+          shape: "convex",
+        });
+
+        const geometry = new scope.THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+        const material = new scope.THREE.MeshBasicMaterial({ color: 0xffff00 });
+        scope.cameraMove.collision = new scope.THREE.Mesh(geometry, material);
+        scope.cameraMove.collision.position.x -= 2;
+        scope.scene.add(scope.cameraMove.collision);
+
+        scope.physics.add.existing(scope.cameraMove.collision, {
+          mass: 0,
+          shape: "cylinder",
+        });
+
+        console.clear();
+        console.log(scope.camera);
+        console.log(scope.cameraMove.collision);
       },
     },
-    // scene1: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=1" },
-    // scene2: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=2" },
-    // scene3: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=3" },
-    // scene4: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=4" },
-    // scene5: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=5" },
-    // scene6: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=6" },
-    // scene7: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=7" },
-    // scene8: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=8" },
-    // scene9: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=9" },
-    // scene10: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=10" },
-    // scene11: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=11" },
-    // scene12: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=12" },
-    // scene13: { url: "/assets/threejs/models/low-poly-level/scene.gltf?id=13" },
   },
-  // cameraMove: {
-  //   front: null,
-  //   left: null,
-  // },
-  // onInput(ev) {
-  //   if (ev.type == "keydown" && ev.key == "w") {
-  //     motor.reactive.cameraMove.front = 1;
-  //   }
-  //   if (ev.type == "keyup" && ev.key == "w") {
-  //     motor.reactive.cameraMove.front = null;
-  //   }
-  //   if (ev.type == "keydown" && ev.key == "s") {
-  //     motor.reactive.cameraMove.front = -1;
-  //   }
-  //   if (ev.type == "keyup" && ev.key == "s") {
-  //     motor.reactive.cameraMove.front = null;
-  //   }
-  //   if (ev.type == "keydown" && ev.key == "a") {
-  //     motor.reactive.cameraMove.left = -1;
-  //   }
-  //   if (ev.type == "keyup" && ev.key == "a") {
-  //     motor.reactive.cameraMove.left = null;
-  //   }
-  //   if (ev.type == "keydown" && ev.key == "d") {
-  //     motor.reactive.cameraMove.left = 1;
-  //   }
-  //   if (ev.type == "keyup" && ev.key == "d") {
-  //     motor.reactive.cameraMove.left = null;
-  //   }
-  // },
-  // onInit(scope) {
-  //   console.log("onInit", scope);
-  // },
+  cameraMove: {
+    collision: null,
+    front: 0,
+    left: 0,
+  },
+  onInput(scope) {
+    this.moveWASD(scope);
+  },
+  moveWASD(scope) {
+    const { event } = scope;
+
+    if (event.type == "keydown" && event.key == "w") {
+      motor.cameraMove.front = 1;
+    }
+    if (event.type == "keyup" && event.key == "w") {
+      motor.cameraMove.front = 0;
+    }
+    if (event.type == "keydown" && event.key == "s") {
+      motor.cameraMove.front = -1;
+    }
+    if (event.type == "keyup" && event.key == "s") {
+      motor.cameraMove.front = 0;
+    }
+    if (event.type == "keydown" && event.key == "a") {
+      motor.cameraMove.left = -1;
+    }
+    if (event.type == "keyup" && event.key == "a") {
+      motor.cameraMove.left = 0;
+    }
+    if (event.type == "keydown" && event.key == "d") {
+      motor.cameraMove.left = 1;
+    }
+    if (event.type == "keyup" && event.key == "d") {
+      motor.cameraMove.left = 0;
+    }
+  },
+  onInit(scope) {
+    motor.cameraMove.direction = new scope.THREE.Vector3();
+  },
+  onUpdate(scope) {
+    const delta = scope.clock.getDelta();
+    scope.pointerLock.instance.moveForward(motor.cameraMove.front / 20, delta);
+    scope.pointerLock.instance.moveRight(motor.cameraMove.left / 20, delta);
+  },
 });
 </script>
