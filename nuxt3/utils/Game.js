@@ -5,7 +5,7 @@ import { PhysicsLoader } from "enable3d";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 
 export const Game = class Game {
-  target = null;
+  options = {};
 
   canvas = {
     target: null,
@@ -31,13 +31,19 @@ export const Game = class Game {
     items: [],
   };
 
-  constructor() {
+  constructor(options = {}) {
+    this.options = {
+      el: null,
+      ...options,
+    };
+
     this.inputInit();
 
     onMounted(() => {
-      this.canvasInit();
-      this.gameInit(() => {
-        this.assetsInit();
+      this.canvasInit(() => {
+        this.gameInit(() => {
+          this.assetsInit();
+        });
       });
     });
   }
@@ -45,7 +51,25 @@ export const Game = class Game {
   inputInit() {
     ["keyup", "keydown", "mousemove", "click"].map((evt) => {
       document.addEventListener(evt, (event) => {
-        const scopeParams = this.getScope({ event });
+        const keyboard = (evt, keys = [], call = () => null) => {
+          if (evt == event.type) {
+            if (keys.length && (event.key || event.code || event.keyCode)) {
+              if (
+                keys.includes(event.key) ||
+                keys.includes(event.code) ||
+                keys.includes(event.keyCode)
+              ) {
+                call(event);
+                return true;
+              }
+              return false;
+            }
+            call(event);
+            return true;
+          }
+          return false;
+        };
+        const scopeParams = this.getScope({ event, keyboard });
         this.onInput(scopeParams);
         this.scripts.items.map((script) => {
           script.onInput(scopeParams);
@@ -54,8 +78,10 @@ export const Game = class Game {
     });
   }
 
-  canvasInit() {
-    this.canvas.target = document.querySelector(this.target);
+  canvasInit(onSuccess = () => null) {
+    if (!this.options.el) return;
+
+    this.canvas.target = document.querySelector(this.options.el);
     this.canvas.width = this.canvas.target.offsetWidth;
     this.canvas.height = this.canvas.target.offsetHeight;
 
@@ -63,6 +89,8 @@ export const Game = class Game {
       this.canvas.width = this.canvas.target.offsetWidth;
       this.canvas.height = this.canvas.target.offsetHeight;
     });
+
+    onSuccess();
   }
 
   assetsInit(onSuccess = () => null) {
@@ -110,10 +138,6 @@ export const Game = class Game {
     };
   }
 
-  targetSet(selector) {
-    this.target = selector;
-  }
-
   getScope(merge = {}) {
     return {
       THREE,
@@ -159,8 +183,9 @@ export const Game = class Game {
     });
   }
 
-  scriptAttach(script) {
+  scriptAttach(object, script) {
     this.scripts.items.push(script);
+    script.object = object;
     script.parent = this;
     script.onCreate(this.getScope());
   }
@@ -180,9 +205,6 @@ export const Script = class Script {
   name = null;
   object = null;
   parent = null;
-  constructor(object) {
-    this.object = object;
-  }
   onCreate(scope) {}
   onUpdate(scope) {}
   onInput(scope) {}
