@@ -4,7 +4,24 @@ import { AmmoPhysics } from "@enable3d/ammo-physics";
 import { PhysicsLoader } from "enable3d";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 
-export const Game = class Game {
+class Base {
+  events = [];
+
+  on(name, callback) {
+    this.events.push({ name, callback });
+  }
+
+  dispatch(...args) {
+    const name = args.shift();
+    this.events
+      .filter((e) => e.name == name)
+      .map(({ name, callback }) => {
+        callback.apply(this, args);
+      });
+  }
+}
+
+export const Game = class Game extends Base {
   options = {};
 
   canvas = {
@@ -32,6 +49,8 @@ export const Game = class Game {
   };
 
   constructor(options = {}) {
+    super();
+
     this.options = {
       el: null,
       ...options,
@@ -71,6 +90,7 @@ export const Game = class Game {
         };
         const scopeParams = this.getScope({ event, keyboard });
         this.onInput(scopeParams);
+        this.dispatch("input", scopeParams);
         this.scripts.items.map((script) => {
           script.onInput(scopeParams);
         });
@@ -79,18 +99,33 @@ export const Game = class Game {
   }
 
   canvasInit(onSuccess = () => null) {
-    if (!this.options.el) return;
+    setTimeout(() => {
+      if (!this.options.el) return;
 
-    this.canvas.target = document.querySelector(this.options.el);
-    this.canvas.width = this.canvas.target.offsetWidth;
-    this.canvas.height = this.canvas.target.offsetHeight;
+      const updateSizeHandler = (scope) => {
+        scope.canvas.width = scope.canvas.target.offsetWidth;
+        scope.canvas.height = scope.canvas.target.offsetHeight;
 
-    window.addEventListener("resize", () => {
-      this.canvas.width = this.canvas.target.offsetWidth;
-      this.canvas.height = this.canvas.target.offsetHeight;
-    });
+        if (scope.game.camera) {
+          scope.game.camera.aspect = scope.canvas.width / scope.canvas.height;
+          scope.game.camera.updateProjectionMatrix();
+        }
 
-    onSuccess();
+        if (scope.game.renderer) {
+          scope.game.renderer.setSize(scope.canvas.width, scope.canvas.height);
+        }
+      };
+
+      if ((this.canvas.target = document.querySelector(this.options.el))) {
+        updateSizeHandler(this);
+
+        window.addEventListener("resize", () => {
+          updateSizeHandler(this);
+        });
+      }
+
+      onSuccess();
+    }, 10);
   }
 
   assetsInit(onSuccess = () => null) {
@@ -105,11 +140,13 @@ export const Game = class Game {
       };
       this.assets.progress = managerProgress.progress;
       this.onLoadProgress(this.getScope({ managerProgress }));
+      this.dispatch("loadProgress", this.getScope({ managerProgress }));
     };
 
     this.assets.manager.onLoad = () => {
       const managerProgress = { progress: 100 };
-      this.onLoadProgress(this.getScope({ managerProgress }));
+      this.onLoadSuccess(this.getScope({ managerProgress }));
+      this.dispatch("loadSuccess", this.getScope({ managerProgress }));
       onSuccess();
     };
 
@@ -162,16 +199,23 @@ export const Game = class Game {
       this.game.physics.debug.mode(1);
 
       this.game.renderer = new THREE.WebGLRenderer({ antialias: true });
-      this.canvas.target.appendChild(this.game.renderer.domElement);
-      this.game.renderer.domElement.style.width = "100%";
-      this.game.renderer.domElement.style.height = "100%";
+      if (this.canvas.target) {
+        this.canvas.target.appendChild(this.game.renderer.domElement);
+        this.game.renderer.domElement.style.width = "100%";
+        this.game.renderer.domElement.style.height = "100%";
+      }
 
       onSuccess();
       this.onCreate(this.getScope());
+      this.dispatch("create", this.getScope());
 
       const updateHandler = () => {
+        this.onUpdate(this.getScope());
+        this.dispatch("update", this.getScope());
+
         this.scripts.items.map((script) => {
           script.onUpdate(this.getScope());
+          script.dispatch("update", this.getScope());
         });
 
         this.game.physics.updateDebugger();
@@ -190,8 +234,10 @@ export const Game = class Game {
     script.onCreate(this.getScope());
   }
 
-  pointerLockControls() {
-    return new PointerLockControls(this.game.camera, this.canvas.target);
+  pointerLockControls(object = null, element = null) {
+    object = object === null ? this.game.camera : object;
+    element = element === null ? this.canvas.target : element;
+    return new PointerLockControls(object, element);
   }
 
   onLoadProgress(scope) {}
@@ -201,11 +247,15 @@ export const Game = class Game {
   onInput(scope) {}
 };
 
-export const Script = class Script {
+export const Script = class Script extends Base {
   name = null;
   object = null;
   parent = null;
   onCreate(scope) {}
   onUpdate(scope) {}
   onInput(scope) {}
+
+  constructor() {
+    super();
+  }
 };

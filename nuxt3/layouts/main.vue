@@ -2,7 +2,7 @@
   <div>
     <div style="display: flex; align-items: center; gap: 10px; padding: 10px">
       <nuxt-link to="/">home</nuxt-link>
-      <nuxt-link to="/test2">/test2</nuxt-link>
+      <nuxt-link to="/test-02">/test-02</nuxt-link>
     </div>
     <div style="padding: 10px">
       <slot></slot>
