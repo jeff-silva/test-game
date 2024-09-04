@@ -1,0 +1,10 @@
+{
+  "name": "test-game",
+  "version": "1.0.0",
+  "repository": "https://github.com/jeff-silva/test-game.git",
+  "author": "Jeferson Silva <jeferson.i.silva@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "dev": "docker compose up --build --force-recreate --remove-orphans"
+  }
+}

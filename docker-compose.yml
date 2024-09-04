@@ -1,0 +1,14 @@
+# Para levantar todos os serviços do arquivo:
+# docker compose up --build --force-recreate --remove-orphans
+
+services:
+  nuxt3:
+    image: node:18.16.0
+    working_dir: /app
+    command: bash -c "yarn install && yarn dev"
+    environment:
+      NUXT3_PORT: 3000
+    ports:
+      - ${NUXT3_PORT:-3000}:3000
+    volumes:
+      - ./nuxt3:/app
