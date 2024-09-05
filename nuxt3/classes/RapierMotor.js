@@ -41,7 +41,11 @@ export const Debug = class Debug {
 };
 
 export const Scene = class Scene {
-  options = {};
+  options = {
+    el: null,
+    debug: false,
+  };
+
   canvas = {
     el: null,
     width: 0,
@@ -52,11 +56,9 @@ export const Scene = class Scene {
   camera = null;
   clock = null;
   renderer = null;
-
-  rapier = {
-    world: null,
-  };
-
+  debug = null;
+  world = null;
+  dynamicBodies = [];
   THREE = null;
   RAPIER = null;
 
@@ -73,8 +75,8 @@ export const Scene = class Scene {
       setTimeout(async () => {
         await RAPIER.init();
         await this.initCanvas();
-        await this.initRapier();
         await this.initGame();
+        await this.initRapier();
         await this.initCanvas();
         await this.initUpdate();
         console.log(this);
@@ -127,16 +129,26 @@ export const Scene = class Scene {
       this.renderer.domElement.style.width = "100%";
       this.renderer.domElement.style.height = "100%";
     }
-
-    this.onCreate();
-    this.dispatch("create");
   }
 
   async initRapier() {
-    this.rapier.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
+    this.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
+
+    if (this.options.debug) {
+      this.debug = new Debug(this.scene, this.world);
+    }
+
+    this.on("update", () => {
+      if (this.debug && this.world) {
+        this.debug.update();
+      }
+    });
   }
 
   async initUpdate() {
+    this.onCreate();
+    this.dispatch("create");
+
     const updateHandler = () => {
       this.onUpdate();
       this.dispatch("update");
@@ -181,6 +193,37 @@ export const Scene = class Scene {
     });
 
     return controls;
+  }
+
+  addPhysics(callback) {
+    let data = {};
+
+    data.mesh = new THREE.Object3D();
+
+    // data.body = this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic());
+    data.body = undefined;
+
+    data.shape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5)
+      .setMass(1)
+      .setRestitution(1.1);
+
+    data = callback(data);
+
+    this.scene.add(data.mesh);
+    this.world.createCollider(data.shape, data.body);
+    this.dynamicBodies.push(data);
+
+    this.on("update", () => {
+      this.dynamicBodies.map(({ mesh, body, shape }) => {
+        if (!body) return;
+        mesh.position.copy(body.translation());
+        mesh.quaternion.copy(body.rotation());
+      });
+
+      const delta = this.clock.getDelta();
+      this.world.timestep = Math.min(delta, 0.1);
+      this.world.step();
+    });
   }
 
   onCreate() {}

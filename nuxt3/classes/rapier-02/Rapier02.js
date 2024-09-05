@@ -37,30 +37,38 @@ export default class Rapier02 extends Scene {
       return random * (size * 2) - size;
     };
 
+    this.addPhysics((data) => {
+      data.shape = this.RAPIER.ColliderDesc.cuboid(100, 0.1, 100);
+      return data;
+    });
+
     // Add cuboids
     for (let i = 0; i < 50; i++) {
-      const cubeMesh = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshNormalMaterial()
-      );
-      cubeMesh.castShadow = true;
-      this.scene.add(cubeMesh);
+      this.addPhysics((data) => {
+        const { RAPIER } = this;
 
-      // const cubeBody = world.createRigidBody(
-      //   RAPIER.RigidBodyDesc.dynamic()
-      //     .setTranslation(randomRange(20), 5, randomRange(20))
-      //     .setCanSleep(false)
-      // );
-      // const cubeShape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5)
-      //   .setMass(1)
-      //   .setRestitution(1.1);
-      // world.createCollider(cubeShape, cubeBody);
-      // dynamicBodies.push([cubeMesh, cubeBody]);
+        data.mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(1, 1, 1),
+          new THREE.MeshNormalMaterial()
+        );
+        data.mesh.castShadow = true;
+
+        data.body = this.world.createRigidBody(
+          RAPIER.RigidBodyDesc.dynamic()
+            .setTranslation(randomRange(20), 5, randomRange(20))
+            .setCanSleep(false)
+        );
+
+        data.shape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5)
+          .setMass(1)
+          .setRestitution(1.1);
+
+        return data;
+      });
     }
 
     // Orbit controls
     this.orbitControls = this.getOrbitControls();
     this.orbitControls.enableDamping = true;
-    // this.orbitControls.target.y = 1;
   }
 }

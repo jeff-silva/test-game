@@ -10,5 +10,5 @@
 
 <script setup>
 import Rapier02 from "@/classes/rapier-02/Rapier02.js";
-new Rapier02({ el: "#game" });
+new Rapier02({ el: "#game", debug: true });
 </script>
