@@ -4,7 +4,8 @@
       <nuxt-link to="/">home</nuxt-link>
       <nuxt-link to="/test-01">/test-01</nuxt-link>
       <nuxt-link to="/test-02">/test-02</nuxt-link>
-      <nuxt-link to="/rapier">/rapier</nuxt-link>
+      <nuxt-link to="/rapier-01">/rapier-01</nuxt-link>
+      <nuxt-link to="/rapier-02">/rapier-02</nuxt-link>
     </div>
     <div style="padding: 10px">
       <slot></slot>
