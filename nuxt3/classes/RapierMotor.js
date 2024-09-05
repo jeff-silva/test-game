@@ -259,6 +259,11 @@ export const Scene = class Scene {
     const updateHandler = () => {
       this.onUpdate();
       this.dispatch("update");
+
+      this.scripts.map((script) => {
+        script.onUpdate();
+      });
+
       this.renderer.render(this.scene, this.camera);
       requestAnimationFrame(updateHandler);
     };
@@ -306,6 +311,14 @@ export const Scene = class Scene {
     return controls;
   }
 
+  scripts = [];
+  scriptAttach(object, script) {
+    script.object = object;
+    script.scene = this;
+    this.scripts.push(script);
+    script.onCreate();
+  }
+
   addPhysics(callback) {
     let data = {};
 
@@ -343,5 +356,9 @@ export const Scene = class Scene {
 };
 
 export const Script = class Scene {
-  //
+  object = null;
+  scene = null;
+
+  onCreate() {}
+  onUpdate() {}
 };

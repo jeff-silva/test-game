@@ -9,7 +9,7 @@
 </template>
 
 <script setup>
-import { Scene } from "@/classes/RapierMotor.js";
+import { Scene, Script } from "@/classes/RapierMotor.js";
 
 class GameScene extends Scene {
   preload() {
@@ -18,6 +18,7 @@ class GameScene extends Scene {
         url: "assets/threejs/models/low-poly-level/scene.gltf",
         onLoad: (item) => {
           this.scene.add(item.model.scene);
+          this.scriptAttach(item.model.scene, new SceneScript());
         },
       },
     };
@@ -27,6 +28,12 @@ class GameScene extends Scene {
     // this.on("input", (ev) => {
     //   console.log(ev);
     // });
+  }
+}
+
+class SceneScript extends Script {
+  onUpdate() {
+    //
   }
 }
 
