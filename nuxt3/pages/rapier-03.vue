@@ -12,15 +12,27 @@
 import { Scene } from "@/classes/RapierMotor.js";
 
 class GameScene extends Scene {
-  preload = {
-    scene: {
-      url: "assets/threejs/models/low-poly-level/scene.gltf",
-      onLoad(self, item) {
-        self.scene.add(item.model.scene);
+  preload() {
+    return {
+      scene: {
+        url: "assets/threejs/models/low-poly-level/scene.gltf",
+        onLoad: (item) => {
+          this.scene.add(item.model.scene);
+        },
       },
-    },
-  };
+    };
+  }
+
+  onCreate() {
+    this.on("input", (ev) => {
+      console.log(ev.pointerType);
+    });
+  }
 }
 
-new GameScene({ el: "#game", debug: true });
+const game = new GameScene({ el: "#game", debug: true });
+
+// game.on("loadProgress", (data) => {
+//   console.log(data.progress);
+// });
 </script>

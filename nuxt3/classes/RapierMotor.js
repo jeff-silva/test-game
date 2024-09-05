@@ -1,4 +1,4 @@
-import { onMounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 
 import RAPIER from "@dimforge/rapier3d-compat";
 
@@ -52,8 +52,6 @@ export const Scene = class Scene {
     height: 0,
   };
 
-  preload = {};
-
   scene = null;
   camera = null;
   clock = null;
@@ -76,13 +74,14 @@ export const Scene = class Scene {
     onMounted(async () => {
       setTimeout(async () => {
         await RAPIER.init();
-        await this.initPreload();
         await this.initCanvas();
         await this.initGame();
         await this.initRapier();
+        await this.initPreload();
         await this.initCanvas();
+        await this.initInputEvents();
         await this.initUpdate();
-        console.log(this);
+        // console.log(this);
       }, 10);
     });
   }
@@ -148,49 +147,104 @@ export const Scene = class Scene {
     });
   }
 
-  async initPreload() {
-    const manager = new THREE.LoadingManager();
-    const config = useRuntimeConfig();
+  initPreload() {
+    return new Promise((resolve, reject) => {
+      const config = useRuntimeConfig();
+      const manager = Object.assign(new THREE.LoadingManager(), {
+        onProgress: (url, itemsLoaded, itemsTotal) => {
+          const progress = (itemsLoaded / itemsTotal) * 100;
+          this.dispatch("loadProgress", {
+            progress,
+            url,
+            itemsLoaded,
+            itemsTotal,
+          });
+        },
+        onLoad: () => {
+          this.dispatch("loadSuccess");
+          resolve();
+        },
+      });
 
-    const modelLoaders = {
-      gltf: (item) => {
-        return new GLTFLoader(manager).load(item.url, (gltf) => {
-          item.loaded = true;
-          item.model = gltf;
-          item.onLoad(this, item);
-        });
-      },
-    };
-
-    Object.entries(this.preload).map(([name, item]) => {
-      item = {
-        name,
-        onLoad: () => null,
-        ...item,
-        ext: item.url.split("?").at(0).split(".").at(-1),
-        loaded: false,
-        model: null,
+      const modelLoaders = {
+        gltf: (item) => {
+          return new GLTFLoader(manager).load(item.url, (gltf) => {
+            item.loaded = true;
+            item.model = gltf;
+            item.onLoad(item);
+          });
+        },
       };
 
-      if (!item.url.startsWith("http")) {
-        const u = new URL(location.href);
-        const itemPath = item.url;
-        item.url = u.origin;
-        if (config.app.baseURL) {
-          if (!config.app.baseURL.startsWith("/")) {
-            item.url += "/";
-          }
-          item.url += config.app.baseURL;
-          if (!config.app.baseURL.endsWith("/") && !itemPath.startsWith("/")) {
-            item.url += "/";
-          }
-          item.url += itemPath;
-        }
-      }
+      let preload = this.preload();
 
-      if (typeof modelLoaders[item.ext] == "function") {
-        modelLoaders[item.ext](item);
-      }
+      Object.entries(preload).map(([name, item]) => {
+        item = {
+          name,
+          onLoad: () => null,
+          ...item,
+          ext: item.url.split("?").at(0).split(".").at(-1),
+          loaded: false,
+          model: null,
+        };
+
+        if (!item.url.startsWith("http")) {
+          const u = new URL(location.href);
+          const itemPath = item.url;
+          item.url = u.origin;
+          if (config.app.baseURL) {
+            if (!config.app.baseURL.startsWith("/")) {
+              item.url += "/";
+            }
+            item.url += config.app.baseURL;
+            if (
+              !config.app.baseURL.endsWith("/") &&
+              !itemPath.startsWith("/")
+            ) {
+              item.url += "/";
+            }
+            item.url += itemPath;
+          }
+        }
+
+        if (typeof modelLoaders[item.ext] == "function") {
+          modelLoaders[item.ext](item);
+        }
+      });
+    });
+  }
+
+  async initInputEvents() {
+    let events = [
+      { type: "mouse", name: "click" },
+      { type: "mouse", name: "mouseenter" },
+      { type: "mouse", name: "mouseleave" },
+      { type: "mouse", name: "mousemove" },
+      { type: "mouse", name: "pointermove" },
+      { type: "mouse", name: "pointerdown" },
+      { type: "keyboard", name: "keyup" },
+      { type: "keyboard", name: "keydown" },
+    ];
+
+    const handler = (ev) => {
+      this.dispatch(`input`, ev);
+      this.dispatch(`input.${ev.type}`, ev);
+    };
+
+    let registeredEvents = [];
+
+    events.map((evt) => {
+      registeredEvents.push({ ...evt, handler });
+    });
+
+    registeredEvents.map((evt) => {
+      document.addEventListener(evt.name, evt.handler);
+    });
+
+    onUnmounted(() => {
+      registeredEvents.map((evt) => {
+        document.removeEventListener(evt.name, evt.handler);
+      });
     });
   }
 
@@ -205,6 +259,10 @@ export const Scene = class Scene {
       requestAnimationFrame(updateHandler);
     };
     requestAnimationFrame(updateHandler);
+  }
+
+  preload() {
+    return {};
   }
 
   events = [];
