@@ -298,6 +298,11 @@
   dependencies:
     mime "^3.0.0"
 
+"@dimforge/rapier3d-compat@^0.14.0":
+  version "0.14.0"
+  resolved "https://registry.yarnpkg.com/@dimforge/rapier3d-compat/-/rapier3d-compat-0.14.0.tgz#c6148f743aa99de320231527c466c1a48ada4c9f"
+  integrity sha512-/uHrUzS+CRQ+NQrrJCEDUkhwHlNsAAexbNXgbN9sHY+GwR+SFFAFrxRr8Llf5/AJZzqiLANdQIfJ63Cw4gJVqw==
+
 "@enable3d/ammo-physics@^0.25.4":
   version "0.25.4"
   resolved "https://registry.yarnpkg.com/@enable3d/ammo-physics/-/ammo-physics-0.25.4.tgz#2b9a7f04f1c0085ff36ba357de04c77291055e36"

@@ -15,6 +15,7 @@
     "vue": "latest"
   },
   "devDependencies": {
+    "@dimforge/rapier3d-compat": "^0.14.0",
     "@types/matter-js": "^0.19.7",
     "@types/three": "^0.168.0",
     "enable3d": "^0.25.4",

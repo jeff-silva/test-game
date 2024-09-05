@@ -5,6 +5,7 @@
   "author": "Jeferson Silva <jeferson.i.silva@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "docker compose up --build --force-recreate --remove-orphans"
+    "dev": "docker compose up --build --force-recreate --remove-orphans",
+    "build": "sh ./bin/build.sh"
   }
 }
