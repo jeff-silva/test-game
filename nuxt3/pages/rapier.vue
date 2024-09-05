@@ -15,13 +15,46 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+class RapierDebugRenderer {
+  mesh;
+  world;
+  enabled = true;
+
+  constructor(scene, world) {
+    this.world = world;
+    this.mesh = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true })
+    );
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  update() {
+    if (this.enabled) {
+      const { vertices, colors } = this.world.debugRender();
+      this.mesh.geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(vertices, 3)
+      );
+      this.mesh.geometry.setAttribute(
+        "color",
+        new THREE.BufferAttribute(colors, 4)
+      );
+      this.mesh.visible = true;
+    } else {
+      this.mesh.visible = false;
+    }
+  }
+}
+
 onMounted(async () => {
   await RAPIER.init();
 
   let gravity = { x: 0.0, y: -9.81, z: 0.0 };
   let world = new RAPIER.World(gravity);
 
-  let groundColliderDesc = RAPIER.ColliderDesc.cuboid(10.0, 0.1, 10.0);
+  let groundColliderDesc = RAPIER.ColliderDesc.cuboid(100, 0.1, 100);
   world.createCollider(groundColliderDesc);
 
   let rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(
@@ -44,6 +77,8 @@ onMounted(async () => {
 
   const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100);
   camera.position.set(0, 2, 5);
+
+  const rapierDebugRenderer = new RapierDebugRenderer(scene, world);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(width, height);
@@ -73,22 +108,31 @@ onMounted(async () => {
   controls.enableDamping = true;
   controls.target.y = 1;
 
-  // Cuboid Collider
-  const cubeMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshNormalMaterial()
-  );
-  cubeMesh.castShadow = true;
-  scene.add(cubeMesh);
+  const randomRange = (size = 10) => {
+    let random = Math.random();
+    return random * (size * 2) - size;
+  };
 
-  const cubeBody = world.createRigidBody(
-    RAPIER.RigidBodyDesc.dynamic().setTranslation(0, 5, 0).setCanSleep(false)
-  );
-  const cubeShape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5)
-    .setMass(1)
-    .setRestitution(1.1);
-  world.createCollider(cubeShape, cubeBody);
-  dynamicBodies.push([cubeMesh, cubeBody]);
+  // Add cuboids
+  for (let i = 0; i < 50; i++) {
+    const cubeMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshNormalMaterial()
+    );
+    cubeMesh.castShadow = true;
+    scene.add(cubeMesh);
+
+    const cubeBody = world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(randomRange(20), 5, randomRange(20))
+        .setCanSleep(false)
+    );
+    const cubeShape = RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5)
+      .setMass(1)
+      .setRestitution(1.1);
+    world.createCollider(cubeShape, cubeBody);
+    dynamicBodies.push([cubeMesh, cubeBody]);
+  }
 
   // Render animation
   const loopHandler = () => {
@@ -101,6 +145,7 @@ onMounted(async () => {
     world.timestep = Math.min(delta, 0.1);
     world.step();
     controls.update();
+    rapierDebugRenderer.update();
     renderer.render(scene, camera);
     requestAnimationFrame(loopHandler);
   };
