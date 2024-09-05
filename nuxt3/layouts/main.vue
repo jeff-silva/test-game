@@ -6,6 +6,7 @@
       <nuxt-link to="/test-02">/test-02</nuxt-link>
       <nuxt-link to="/rapier-01">/rapier-01</nuxt-link>
       <nuxt-link to="/rapier-02">/rapier-02</nuxt-link>
+      <nuxt-link to="/rapier-03">/rapier-03</nuxt-link>
     </div>
     <div style="padding: 10px">
       <slot></slot>

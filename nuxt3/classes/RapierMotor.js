@@ -52,6 +52,8 @@ export const Scene = class Scene {
     height: 0,
   };
 
+  preload = {};
+
   scene = null;
   camera = null;
   clock = null;
@@ -74,6 +76,7 @@ export const Scene = class Scene {
     onMounted(async () => {
       setTimeout(async () => {
         await RAPIER.init();
+        await this.initPreload();
         await this.initCanvas();
         await this.initGame();
         await this.initRapier();
@@ -141,6 +144,52 @@ export const Scene = class Scene {
     this.on("update", () => {
       if (this.debug && this.world) {
         this.debug.update();
+      }
+    });
+  }
+
+  async initPreload() {
+    const manager = new THREE.LoadingManager();
+    const config = useRuntimeConfig();
+
+    const modelLoaders = {
+      gltf: (item) => {
+        return new GLTFLoader(manager).load(item.url, (gltf) => {
+          item.loaded = true;
+          item.model = gltf;
+          item.onLoad(this, item);
+        });
+      },
+    };
+
+    Object.entries(this.preload).map(([name, item]) => {
+      item = {
+        name,
+        onLoad: () => null,
+        ...item,
+        ext: item.url.split("?").at(0).split(".").at(-1),
+        loaded: false,
+        model: null,
+      };
+
+      if (!item.url.startsWith("http")) {
+        const u = new URL(location.href);
+        const itemPath = item.url;
+        item.url = u.origin;
+        if (config.app.baseURL) {
+          if (!config.app.baseURL.startsWith("/")) {
+            item.url += "/";
+          }
+          item.url += config.app.baseURL;
+          if (!config.app.baseURL.endsWith("/") && !itemPath.startsWith("/")) {
+            item.url += "/";
+          }
+          item.url += itemPath;
+        }
+      }
+
+      if (typeof modelLoaders[item.ext] == "function") {
+        modelLoaders[item.ext](item);
       }
     });
   }
