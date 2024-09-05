@@ -25,31 +25,83 @@ class Base {
     }
   }
 
-  input = {};
-  definedInputs = {};
+  inputDefine(inputs = {}) {
+    let proxyObj = {};
+    Object.entries(inputs).map(([name, call]) => {
+      proxyObj[name] = call({ type: null });
+    });
+    return new Proxy(proxyObj, {
+      get: (target, name) => {
+        if (typeof inputs[name] == "function") {
+          return inputs[name]();
+        }
+        return proxyObj[name] || null;
+      },
+    });
+  }
 
-  defineInput(inputs = {}) {
-    this.definedInputs = { ...this.definedInputs, ...inputs };
-    this.input = this.getInput(null);
-    ["keyup", "keydown", "mousemove", "click"].map((evt) => {
-      document.addEventListener(evt, (event) => {
-        this.input = this.getInput(event);
+  keyboard = {};
+  mouse = {};
+
+  inputInit() {
+    ["keyup", "keydown", "click"].map((evt) => {
+      document.addEventListener(evt, (ev) => {
+        if (!ev.key) return;
+        this.keyboard[ev.key] = ev.type == "keydown";
       });
     });
+
+    ["mousemove", "pointerdown", "pointermove", "mousedown", "mouseup"].map(
+      (evt) => {
+        document.addEventListener(evt, (ev) => {
+          if (ev.type == "pointermove") {
+            this.mouse.movementX = ev.movementX;
+            this.mouse.movementY = ev.movementY;
+          }
+          this.mouse.offsetX = ev.offsetX;
+          this.mouse.offsetY = ev.offsetY;
+          this.mouse.l = ev.type == "mousedown" && ev.button == 0;
+          this.mouse.m = ev.type == "mousedown" && ev.button == 1;
+          this.mouse.b = ev.type == "mousedown" && ev.button == 2;
+        });
+      }
+    );
   }
 
-  getInput(ev = null) {
-    let input = {};
-    Object.entries(this.definedInputs).map(([name, callback]) => {
-      input[name] = callback(ev ?? { type: null });
-    });
-    return input;
-  }
+  // input = {};
+  // definedInputs = {};
+
+  // defineInput(inputs = {}) {
+  //   this.definedInputs = { ...this.definedInputs, ...inputs };
+  //   this.input = this.getInput(null);
+  //   [
+  //     "keyup",
+  //     "keydown",
+  //     "mousemove",
+  //     "click",
+  //     "pointerdown",
+  //     "pointermove",
+  //   ].map((evt) => {
+  //     document.addEventListener(evt, (event) => {
+  //       this.input = this.getInput(event);
+  //     });
+  //   });
+  // }
+
+  // getInput(ev = null) {
+  //   let input = {};
+  //   Object.entries(this.definedInputs).map(([name, callback]) => {
+  //     input[name] = callback(ev ?? { type: null });
+  //   });
+  //   return input;
+  // }
 
   getScope(merge = {}) {
     return {
       THREE,
       ...this,
+      on: this.on,
+      dispatch: this.dispatch,
       getInput: this.getInput,
       ...merge,
     };
@@ -102,36 +154,43 @@ export const Game = class Game extends Base {
     });
   }
 
-  inputInit() {
-    ["keyup", "keydown", "mousemove", "click"].map((evt) => {
-      document.addEventListener(evt, (event) => {
-        const keyboard = (evt, keys = [], call = () => null) => {
-          if (evt == event.type) {
-            if (keys.length && (event.key || event.code || event.keyCode)) {
-              if (
-                keys.includes(event.key) ||
-                keys.includes(event.code) ||
-                keys.includes(event.keyCode)
-              ) {
-                call(event);
-                return true;
-              }
-              return false;
-            }
-            call(event);
-            return true;
-          }
-          return false;
-        };
-        const scopeParams = this.getScope({ event, keyboard });
-        this.onInput(scopeParams);
-        this.dispatch("input", scopeParams);
-        this.scripts.items.map((script) => {
-          script.onInput(scopeParams);
-        });
-      });
-    });
-  }
+  // inputInit() {
+  //   [
+  //     "keyup",
+  //     "keydown",
+  //     "mousemove",
+  //     "click",
+  //     "pointerdown",
+  //     "pointermove",
+  //   ].map((evt) => {
+  //     document.addEventListener(evt, (event) => {
+  //       const keyboard = (evt, keys = [], call = () => null) => {
+  //         if (evt == event.type) {
+  //           if (keys.length && (event.key || event.code || event.keyCode)) {
+  //             if (
+  //               keys.includes(event.key) ||
+  //               keys.includes(event.code) ||
+  //               keys.includes(event.keyCode)
+  //             ) {
+  //               call(event);
+  //               return true;
+  //             }
+  //             return false;
+  //           }
+  //           call(event);
+  //           return true;
+  //         }
+  //         return false;
+  //       };
+  //       const scopeParams = this.getScope({ event, keyboard });
+  //       this.onInput(scopeParams);
+  //       this.dispatch("input", scopeParams);
+  //       this.scripts.items.map((script) => {
+  //         script.onInput(scopeParams);
+  //       });
+  //     });
+  //   });
+  // }
 
   canvasInit(onSuccess = () => null) {
     setTimeout(() => {

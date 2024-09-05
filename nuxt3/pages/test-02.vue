@@ -16,10 +16,6 @@ const appGame = new AppGame({
   el: "#app-game",
 });
 
-appGame.on("input", (scope) => {
-  appGameData.input = scope.getInput(scope.event);
-});
-
 const appGameData = reactive({
   input: {},
 });
