@@ -24,9 +24,9 @@ class GameScene extends Scene {
   }
 
   onCreate() {
-    this.on("input", (ev) => {
-      console.log(ev.pointerType);
-    });
+    // this.on("input", (ev) => {
+    //   console.log(ev);
+    // });
   }
 }
 
@@ -35,4 +35,16 @@ const game = new GameScene({ el: "#game", debug: true });
 // game.on("loadProgress", (data) => {
 //   console.log(data.progress);
 // });
+
+game.on("destroy", () => {
+  location.reload();
+});
+
+onMounted(() => {
+  game.init();
+});
+
+onUnmounted(() => {
+  game.destroy();
+});
 </script>

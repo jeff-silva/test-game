@@ -1,5 +1,3 @@
-import { onMounted, onUnmounted } from "vue";
-
 import RAPIER from "@dimforge/rapier3d-compat";
 
 import * as THREE from "three";
@@ -70,8 +68,10 @@ export const Scene = class Scene {
 
     this.THREE = THREE;
     this.RAPIER = RAPIER;
+  }
 
-    onMounted(async () => {
+  init() {
+    return new Promise((resolve, reject) => {
       setTimeout(async () => {
         await RAPIER.init();
         await this.initCanvas();
@@ -81,9 +81,13 @@ export const Scene = class Scene {
         await this.initCanvas();
         await this.initInputEvents();
         await this.initUpdate();
-        // console.log(this);
+        resolve({});
       }, 10);
     });
+  }
+
+  destroy() {
+    this.dispatch("destroy");
   }
 
   async initCanvas() {
@@ -241,7 +245,7 @@ export const Scene = class Scene {
       document.addEventListener(evt.name, evt.handler);
     });
 
-    onUnmounted(() => {
+    this.on("destroy", () => {
       registeredEvents.map((evt) => {
         document.removeEventListener(evt.name, evt.handler);
       });
