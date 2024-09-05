@@ -72,14 +72,17 @@ export default class extends Script {
     // this.cameraPhysics.body.setCcdMotionThreshold(1e-7);
     // this.cameraPhysics.body.setCcdSweptSphereRadius(0.25);
 
+    this.cameraPhysics.attach(scope.game.camera);
     scope.game.camera.position.set(0, 1, 0);
 
-    this.cameraPhysics.attach(scope.game.camera);
-
-    this.pointerLock = this.parent.pointerLockControls(this.cameraPhysics);
+    // this.pointerLock = this.parent.pointerLockControls(this.cameraPhysics);
+    this.pointerLock = this.parent.pointerLockControls(scope.game.camera);
     this.pointerLock.pointerSpeed = 0.4;
 
     this.defineInput({
+      pointerLock(ev) {
+        return ev.type == "click";
+      },
       front(ev) {
         if (ev.type == "keydown" && ev.key == "w") {
           return 1;
@@ -107,8 +110,14 @@ export default class extends Script {
     });
 
     this.on("update", (scope) => {
-      // console.log(`front: ${this.input.front}, side: ${this.input.side}`);
-      // console.log(this.input.test);
+      if (this.input.pointerLock) {
+        this.pointerLock.lock();
+        this.input.pointerLock = false;
+      }
+
+      this.cameraPhysics.position.x += 0.5;
+      console.log(this.cameraPhysics.position.x);
+
       // // Move cameraPhysics
       // (() => {
       //   const { x, y, z } = this.cameraPhysics.position;
@@ -117,17 +126,20 @@ export default class extends Script {
       //   this.cameraPhysics.needUpdate = true;
       //   console.log(this.cameraPhysics.position);
       // })();
+
       // // Rotate cameraPhysics
       // (() => {
       //   const { x, y, z } = this.cameraPhysics.rotation;
       //   scope.game.camera.rotation.set(x, y, z);
       // })();
-      // // // Pointer lock mov
+
+      // // // Pointer lock <move></move>
       // (() => {
       //   const delta = scope.game.clock.getDelta();
-      //   this.pointerLock.moveForward(this.cameraMove.front / 20, delta);
-      //   this.pointerLock.moveRight(this.cameraMove.side / 20, delta);
+      //   this.pointerLock.moveForward(this.input.front / 20, delta);
+      //   this.pointerLock.moveRight(this.input.side / 20, delta);
       // })();
+
       // // Object move
       // (() => {
       //   if (this.cameraMove.front == 0) return;

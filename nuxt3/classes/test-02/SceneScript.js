@@ -2,6 +2,7 @@ import { Script } from "@/classes/Motor.js";
 
 export default class extends Script {
   name = "Scene script";
+
   onCreate(scope) {
     this.collisionsIgnore = [
       "Line037_12",
