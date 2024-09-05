@@ -12,12 +12,47 @@ class Base {
   }
 
   dispatch(...args) {
-    const name = args.shift();
+    const argsClone = args;
+    const name = argsClone.shift();
     this.events
       .filter((e) => e.name == name)
       .map(({ name, callback }) => {
-        callback.apply(this, args);
+        callback.apply(this, argsClone);
       });
+
+    if (this.parent) {
+      this.parent.dispatch(...args);
+    }
+  }
+
+  input = {};
+  definedInputs = {};
+
+  defineInput(inputs = {}) {
+    this.definedInputs = { ...this.definedInputs, ...inputs };
+    this.input = this.getInput(null);
+    ["keyup", "keydown", "mousemove", "click"].map((evt) => {
+      document.addEventListener(evt, (event) => {
+        this.input = this.getInput(event);
+      });
+    });
+  }
+
+  getInput(ev = null) {
+    let input = {};
+    Object.entries(this.definedInputs).map(([name, callback]) => {
+      input[name] = callback(ev ?? { type: null });
+    });
+    return input;
+  }
+
+  getScope(merge = {}) {
+    return {
+      THREE,
+      ...this,
+      getInput: this.getInput,
+      ...merge,
+    };
   }
 }
 
@@ -172,14 +207,6 @@ export const Game = class Game extends Base {
       name,
       onLoad: (scope) => null,
       ...data,
-    };
-  }
-
-  getScope(merge = {}) {
-    return {
-      THREE,
-      ...this,
-      ...merge,
     };
   }
 

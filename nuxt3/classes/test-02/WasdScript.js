@@ -10,43 +10,44 @@ export default class extends Script {
 
     this.cameraPhysicsCreate(scope);
   }
-  onInput(scope) {
-    scope.keyboard("click", [], () => {
-      this.pointerLock.lock();
-    });
 
-    scope.keyboard("keydown", ["w"], () => {
-      this.cameraMove.front = 1;
-    });
+  // onInput(scope) {
+  //   scope.keyboard("click", [], () => {
+  //     this.pointerLock.lock();
+  //   });
 
-    scope.keyboard("keydown", ["s"], () => {
-      this.cameraMove.front = -1;
-    });
+  //   scope.keyboard("keydown", ["w"], () => {
+  //     this.cameraMove.front = 1;
+  //   });
 
-    scope.keyboard("keydown", ["a"], () => {
-      this.cameraMove.side = -1;
-    });
+  //   scope.keyboard("keydown", ["s"], () => {
+  //     this.cameraMove.front = -1;
+  //   });
 
-    scope.keyboard("keydown", ["d"], () => {
-      this.cameraMove.side = 1;
-    });
+  //   scope.keyboard("keydown", ["a"], () => {
+  //     this.cameraMove.side = -1;
+  //   });
 
-    scope.keyboard("keyup", ["w"], () => {
-      this.cameraMove.front = 0;
-    });
+  //   scope.keyboard("keydown", ["d"], () => {
+  //     this.cameraMove.side = 1;
+  //   });
 
-    scope.keyboard("keyup", ["s"], () => {
-      this.cameraMove.front = 0;
-    });
+  //   scope.keyboard("keyup", ["w"], () => {
+  //     this.cameraMove.front = 0;
+  //   });
 
-    scope.keyboard("keyup", ["a"], () => {
-      this.cameraMove.side = 0;
-    });
+  //   scope.keyboard("keyup", ["s"], () => {
+  //     this.cameraMove.front = 0;
+  //   });
 
-    scope.keyboard("keyup", ["d"], () => {
-      this.cameraMove.side = 0;
-    });
-  }
+  //   scope.keyboard("keyup", ["a"], () => {
+  //     this.cameraMove.side = 0;
+  //   });
+
+  //   scope.keyboard("keyup", ["d"], () => {
+  //     this.cameraMove.side = 0;
+  //   });
+  // }
 
   cameraPhysicsCreate(scope) {
     this.cameraPhysics = scope.game.physics.add.capsule(
@@ -78,7 +79,36 @@ export default class extends Script {
     this.pointerLock = this.parent.pointerLockControls(this.cameraPhysics);
     this.pointerLock.pointerSpeed = 0.4;
 
+    this.defineInput({
+      front(ev) {
+        if (ev.type == "keydown" && ev.key == "w") {
+          return 1;
+        }
+        if (ev.type == "keydown" && ev.key == "s") {
+          return -1;
+        }
+        return 0;
+      },
+      side(ev) {
+        if (ev.type == "keydown" && ev.key == "a") {
+          return -1;
+        }
+        if (ev.type == "keydown" && ev.key == "d") {
+          return 1;
+        }
+        return 0;
+      },
+      test(ev) {
+        if (ev.type == "keyup" && ev.key == "Escape") {
+          return true;
+        }
+        return false;
+      },
+    });
+
     this.on("update", (scope) => {
+      // console.log(`front: ${this.input.front}, side: ${this.input.side}`);
+      // console.log(this.input.test);
       // // Move cameraPhysics
       // (() => {
       //   const { x, y, z } = this.cameraPhysics.position;
