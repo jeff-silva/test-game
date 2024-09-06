@@ -59,6 +59,15 @@ export const Scene = class Scene {
   THREE = null;
   RAPIER = null;
 
+  events = [];
+  scripts = [];
+
+  input = {
+    mouse: {},
+    keyboard: {},
+    joystick: {},
+  };
+
   constructor(options = {}) {
     this.options = {
       el: null,
@@ -231,14 +240,18 @@ export const Scene = class Scene {
       { type: "keyboard", name: "keydown" },
     ];
 
-    const handler = (ev) => {
+    const defaultHandler = (ev, evt) => {
       this.dispatch(`input`, ev);
       this.dispatch(`input.${ev.type}`, ev);
+      this.dispatch(`input.${ev.name}`, ev);
     };
 
     let registeredEvents = [];
 
     events.map((evt) => {
+      const handler = (ev) => {
+        return defaultHandler(ev, evt);
+      };
       registeredEvents.push({ ...evt, handler });
     });
 
@@ -265,6 +278,8 @@ export const Scene = class Scene {
         script.onUpdate();
       });
 
+      // this.renderer.domElement.style.width = "100%";
+      // this.renderer.domElement.style.height = "100%";
       this.renderer.render(this.scene, this.camera);
       requestAnimationFrame(updateHandler);
     };
@@ -274,8 +289,6 @@ export const Scene = class Scene {
   preload() {
     return {};
   }
-
-  events = [];
 
   on(name, callback) {
     this.events.push({ name, callback });
@@ -353,8 +366,10 @@ export const Scene = class Scene {
       }
     );
 
-    this.on("input.click", () => {
-      controls.lock();
+    this.on("input.click", (ev) => {
+      if (this.canvas.el == ev.target || this.canvas.el.contains(ev.target)) {
+        controls.lock();
+      }
     });
 
     this.on("input.pointermove", (ev) => {
@@ -406,7 +421,6 @@ export const Scene = class Scene {
     return defaults;
   }
 
-  scripts = [];
   scriptAttach(object, script) {
     script.object = object;
     script.scene = this;
