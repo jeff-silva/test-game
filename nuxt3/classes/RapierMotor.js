@@ -63,7 +63,11 @@ export const Scene = class Scene {
   scripts = [];
 
   input = {
-    mouse: {},
+    mouse: {
+      click: { x: 0, y: 0 },
+      movement: { x: 0, y: 0 },
+      offset: { x: 0, y: 0 },
+    },
     keyboard: {},
     joystick: {},
   };
@@ -241,9 +245,32 @@ export const Scene = class Scene {
     ];
 
     const defaultHandler = (ev, evt) => {
-      this.dispatch(`input`, ev);
-      this.dispatch(`input.${ev.type}`, ev);
-      this.dispatch(`input.${ev.name}`, ev);
+      const eventKeys = [`input`, `input.${evt.type}`, `input.${ev.type}`];
+      eventKeys.map((eventKey) => {
+        this.dispatch(eventKey, ev);
+
+        if (ev.type == "keydown") {
+          this.input.keyboard[ev.key] = true;
+          this.input.keyboard[ev.code] = true;
+          this.input.keyboard[ev.keyCode] = true;
+        }
+        if (ev.type == "keyup") {
+          this.input.keyboard[ev.key] = null;
+          this.input.keyboard[ev.code] = null;
+          this.input.keyboard[ev.keyCode] = null;
+        }
+        if (ev.type == "click") {
+          this.input.mouse.click.x = ev.offsetX;
+          this.input.mouse.click.y = ev.offsetY;
+        }
+        if (["mousemove", "pointermove"].includes(ev.type)) {
+          for (let attr in this.input.mouse) {
+            if (typeof ev[`${attr}X`] == "undefined") continue;
+            this.input.mouse[attr]["x"] = ev[`${attr}X`];
+            this.input.mouse[attr]["y"] = ev[`${attr}Y`];
+          }
+        }
+      });
     };
 
     let registeredEvents = [];
@@ -277,6 +304,16 @@ export const Scene = class Scene {
       this.scripts.map((script) => {
         script.onUpdate();
       });
+
+      this.dynamicBodies.map(({ mesh, body, shape }) => {
+        if (!body) return;
+        mesh.position.copy(body.translation());
+        mesh.quaternion.copy(body.rotation());
+      });
+
+      const delta = this.clock.getDelta();
+      this.world.timestep = Math.min(delta, 0.1);
+      this.world.step();
 
       // this.renderer.domElement.style.width = "100%";
       // this.renderer.domElement.style.height = "100%";
@@ -401,26 +438,6 @@ export const Scene = class Scene {
     return controls;
   }
 
-  getInputsControl(inputs = {}) {
-    let defaults = {};
-    for (let name in inputs) {
-      defaults[name] = inputs[name]({ type: null });
-    }
-
-    this.on("input", (ev) => {
-      for (let name in inputs) {
-        defaults[name] = inputs[name](ev);
-        // if (ev.type == "mousedown") {
-        //   defaults[name] = inputs[name](ev);
-        //   continue;
-        // }
-        // defaults[name] = inputs[name]({ type: null });
-      }
-    });
-
-    return defaults;
-  }
-
   scriptAttach(object, script) {
     script.object = object;
     script.scene = this;
@@ -445,18 +462,70 @@ export const Scene = class Scene {
     this.scene.add(data.mesh);
     this.world.createCollider(data.shape, data.body);
     this.dynamicBodies.push(data);
+  }
 
-    this.on("update", () => {
-      this.dynamicBodies.map(({ mesh, body, shape }) => {
-        if (!body) return;
-        mesh.position.copy(body.translation());
-        mesh.quaternion.copy(body.rotation());
-      });
+  basicMeshPhysicsAdd(options = {}) {
+    options = {
+      geometry: {},
+      position: { x: 0, y: 0, z: 0 },
+      material: {},
+      body: {},
+      ...options,
+    };
 
-      const delta = this.clock.getDelta();
-      this.world.timestep = Math.min(delta, 0.1);
-      this.world.step();
-    });
+    options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
+    options.material = new ThreeMaterial().optionsMerge(options.material || {});
+    options.body = new RapierBody().optionsMerge(options.body || {});
+
+    let data = {};
+
+    const geometry = new ThreeGeometry(options.geometry).get();
+    const material = new ThreeMaterial(options.material).get();
+    const shape = new RapierShape(options.geometry).get();
+    const body = new RapierBody(options.body).get();
+
+    data.mesh = new THREE.Mesh(geometry, material);
+
+    data.mesh.position.set(
+      options.position.x,
+      options.position.y,
+      options.position.z
+    );
+
+    data.body = this.world.createRigidBody(
+      body
+        .setCanSleep(options.body.canSleep)
+        .setTranslation(
+          options.position.x,
+          options.position.y,
+          options.position.z
+        )
+    );
+
+    data.shape = shape
+      .setMass(options.body.mass)
+      .setRestitution(options.body.restitution);
+
+    this.scene.add(data.mesh);
+    this.world.createCollider(data.shape, data.body);
+    this.dynamicBodies.push(data);
+
+    return data;
+  }
+
+  physicsAttach(mesh, options = {}) {
+    // // options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
+    // options.body = new RapierBody().optionsMerge(options.body || {});
+    // let data = {};
+    // data.mesh = mesh;
+    // data.body = undefined;
+    // data.shape = undefined;
+    // // const shape = new RapierShape(options.geometry).get();
+    // // const body = new RapierBody(options.body).get();
+    // console.log(options);
+    // this.world.createCollider(data.shape, data.body);
+    // this.dynamicBodies.push(data);
+    // return data;
   }
 
   onCreate() {}
@@ -471,3 +540,136 @@ export const Script = class Scene {
   onCreate() {}
   onUpdate() {}
 };
+
+class ThreeRapierFormatBase {
+  name = "Format base";
+  options = {};
+
+  constructor(options = {}) {
+    this.options = this.optionsMerge(options);
+  }
+
+  optionsDefault() {
+    return { type: null };
+  }
+
+  optionsMerge(options = {}) {
+    return {
+      ...this.optionsDefault(),
+      ...options,
+    };
+  }
+
+  itemsTypes() {
+    return {
+      default: () => null,
+    };
+  }
+
+  get() {
+    const items = this.itemsTypes();
+    if (typeof items[this.options.type] == "undefined") {
+      throw new Error(`${this.name} "${this.options.type}" does not exists`);
+    }
+    return items[this.options.type]();
+  }
+}
+
+class ThreeGeometry extends ThreeRapierFormatBase {
+  name = "Three Geometry";
+  optionsDefault() {
+    return {
+      type: null,
+      radius: 1,
+      length: 1,
+      capSegments: 4,
+      radialSegments: 8,
+      width: 1,
+      height: 1,
+      depth: 1,
+    };
+  }
+  itemsTypes() {
+    return {
+      capsule: () =>
+        new THREE.CapsuleGeometry(
+          this.options.radius,
+          this.options.length,
+          this.options.capSegments,
+          this.options.radialSegments
+        ),
+      cube: () =>
+        new THREE.BoxGeometry(
+          this.options.width,
+          this.options.height,
+          this.options.depth
+        ),
+    };
+  }
+}
+
+class ThreeMaterial extends ThreeRapierFormatBase {
+  name = "Three Material";
+  optionsDefault() {
+    return {
+      type: "basic",
+      color: 0xffffff,
+    };
+  }
+  itemsTypes() {
+    return {
+      basic: () =>
+        new THREE.MeshBasicMaterial({ ...this.options, type: undefined }),
+    };
+  }
+}
+
+class RapierShape extends ThreeRapierFormatBase {
+  name = "Rapier Shape";
+  optionsDefault() {
+    return {
+      type: null,
+      radius: 1,
+      length: 1,
+      capSegments: 4,
+      radialSegments: 8,
+      width: 1,
+      height: 1,
+      depth: 1,
+    };
+  }
+  itemsTypes() {
+    return {
+      capsule: () =>
+        RAPIER.ColliderDesc.capsule(
+          this.options.length / 2,
+          this.options.radius
+        ),
+      cube: () =>
+        RAPIER.ColliderDesc.cuboid(
+          this.options.width / 2,
+          this.options.height / 2,
+          this.options.depth / 2
+        ),
+      // trimesh: () => RAPIER.ColliderDesc.trimesh(),
+    };
+  }
+}
+
+class RapierBody extends ThreeRapierFormatBase {
+  name = "Rapier Body";
+  optionsDefault() {
+    return {
+      type: "dynamic",
+      mass: 1,
+      restitution: 1,
+      canSleep: false,
+    };
+  }
+  itemsTypes() {
+    return {
+      fixed: () => RAPIER.RigidBodyDesc.fixed(),
+      dynamic: () => RAPIER.RigidBodyDesc.dynamic(),
+    };
+  }
+}

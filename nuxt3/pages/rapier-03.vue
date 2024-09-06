@@ -20,6 +20,7 @@ class GameScene extends Scene {
         onLoad: (item) => {
           this.scene.add(item.model.scene);
           this.scriptAttach(item.model.scene, new SceneScript());
+          this.physicsAttach(item.model.scene);
         },
       },
     };
@@ -42,6 +43,7 @@ class WasdScript extends Script {
   onCreate() {
     this.pointerLockControlsInit();
     this.movementControlsInit();
+    this.testInit();
   }
 
   pointerLockControlsInit() {
@@ -52,23 +54,38 @@ class WasdScript extends Script {
   }
 
   movementControlsInit() {
-    // this.move = this.scene.getInputsControl({
-    //   front(ev) {
-    //     if (ev.type == "keydown" && ev.key == "w") return 1;
-    //     if (ev.type == "keydown" && ev.key == "s") return -1;
-    //     return 0;
-    //   },
-    //   right(ev) {
-    //     if (ev.type == "keydown" && ev.key == "a") return -1;
-    //     if (ev.type == "keydown" && ev.key == "d") return 1;
-    //     return 0;
-    //   },
-    // });
-    // this.scene.on("update", () => {
-    //   this.pointerLock.moveForward(this.move.front / 20);
-    //   this.pointerLock.moveRight(this.move.right / 20);
-    //   console.log(JSON.stringify(this.move));
-    // });
+    this.scene.on("update", () => {
+      const speed = 0.04;
+      if (this.scene.input.keyboard.w) {
+        this.pointerLock.moveForward(speed);
+      }
+      if (this.scene.input.keyboard.s) {
+        this.pointerLock.moveForward(-speed);
+      }
+      if (this.scene.input.keyboard.a) {
+        this.pointerLock.moveRight(-speed);
+      }
+      if (this.scene.input.keyboard.d) {
+        this.pointerLock.moveRight(speed);
+      }
+    });
+  }
+
+  testInit() {
+    this.scene.basicMeshPhysicsAdd({
+      position: { x: -4, y: 0, z: 0 },
+      geometry: { type: "capsule", radius: 0.2, length: 1 },
+    });
+
+    this.scene.basicMeshPhysicsAdd({
+      position: { x: -2, y: 0, z: 0 },
+      geometry: {
+        type: "cube",
+        width: 0.6,
+        height: 0.6,
+        depth: 0.6,
+      },
+    });
   }
 }
 
