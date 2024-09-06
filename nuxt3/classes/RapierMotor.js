@@ -2,7 +2,6 @@ import RAPIER from "@dimforge/rapier3d-compat";
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 export const Debug = class Debug {
@@ -396,6 +395,11 @@ export const Scene = class Scene {
     this.on("input", (ev) => {
       for (let name in inputs) {
         defaults[name] = inputs[name](ev);
+        // if (ev.type == "mousedown") {
+        //   defaults[name] = inputs[name](ev);
+        //   continue;
+        // }
+        // defaults[name] = inputs[name]({ type: null });
       }
     });
 

@@ -11,6 +11,7 @@
 <script setup>
 import { Scene, Script } from "@/classes/RapierMotor.js";
 
+// Main scene
 class GameScene extends Scene {
   preload() {
     return {
@@ -29,12 +30,14 @@ class GameScene extends Scene {
   }
 }
 
+// Script that controls the scene
 class SceneScript extends Script {
   onCreate() {
     this.scene.camera.position.set(-3, 0, 2);
   }
 }
 
+// Script that controls camera movement
 class WasdScript extends Script {
   onCreate() {
     this.pointerLockControlsInit();
@@ -49,23 +52,23 @@ class WasdScript extends Script {
   }
 
   movementControlsInit() {
-    this.move = this.scene.getInputsControl({
-      front(ev) {
-        if (ev.type == "keydown" && ev.key == "w") return 1;
-        if (ev.type == "keydown" && ev.key == "s") return -1;
-        return 0;
-      },
-      right(ev) {
-        if (ev.type == "keydown" && ev.key == "a") return -1;
-        if (ev.type == "keydown" && ev.key == "d") return 1;
-        return 0;
-      },
-    });
-
-    this.scene.on("update", () => {
-      this.pointerLock.moveForward(this.move.front / 20);
-      this.pointerLock.moveRight(this.move.right / 20);
-    });
+    // this.move = this.scene.getInputsControl({
+    //   front(ev) {
+    //     if (ev.type == "keydown" && ev.key == "w") return 1;
+    //     if (ev.type == "keydown" && ev.key == "s") return -1;
+    //     return 0;
+    //   },
+    //   right(ev) {
+    //     if (ev.type == "keydown" && ev.key == "a") return -1;
+    //     if (ev.type == "keydown" && ev.key == "d") return 1;
+    //     return 0;
+    //   },
+    // });
+    // this.scene.on("update", () => {
+    //   this.pointerLock.moveForward(this.move.front / 20);
+    //   this.pointerLock.moveRight(this.move.right / 20);
+    //   console.log(JSON.stringify(this.move));
+    // });
   }
 }
 
