@@ -474,16 +474,17 @@ export const Scene = class Scene {
     };
 
     options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
-    options.material = new ThreeMaterial().optionsMerge(options.material || {});
-    options.body = new RapierBody().optionsMerge(options.body || {});
-
-    let data = {};
-
     const geometry = new ThreeGeometry(options.geometry).get();
+
+    options.material = new ThreeMaterial().optionsMerge(options.material || {});
     const material = new ThreeMaterial(options.material).get();
-    const shape = new RapierShape(options.geometry).get();
+
+    options.body = new RapierBody().optionsMerge(options.body || {});
     const body = new RapierBody(options.body).get();
 
+    const shape = new RapierShape(options.geometry).get();
+
+    let data = {};
     data.mesh = new THREE.Mesh(geometry, material);
 
     data.mesh.position.set(
@@ -513,7 +514,49 @@ export const Scene = class Scene {
     return data;
   }
 
+  coplexPhysicsAttach(mesh, options = {}) {
+    let rets = [];
+
+    options.body = new RapierBody().optionsMerge(options.body || {});
+    const body = new RapierBody(options.body).get();
+
+    mesh.traverse((child) => {
+      if (!child.isMesh) return;
+      let data = { mesh, body };
+
+      let vertices = child.geometry.attributes.position.array;
+      let indices = child.geometry.index.array;
+      data.shape = RAPIER.ColliderDesc.trimesh(vertices, indices);
+
+      rets.push(data);
+      this.world.createCollider(data.shape, data.body);
+      this.dynamicBodies.push(data);
+    });
+
+    // const trimesh = new RAPIER.TriMesh(vertices, indices);
+    // data.shape = RAPIER.ColliderDesc.trimesh(trimesh);
+    // console.log(options, data);
+    return rets;
+  }
+
   physicsAttach(mesh, options = {}) {
+    options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
+    options.body = new RapierBody().optionsMerge(options.body || {});
+
+    let data = {};
+    data.mesh = mesh;
+    data.body = new RapierBody(options.body).get();
+    data.shape = new RapierShape(options.geometry).get();
+
+    console.log(options);
+    console.log(data);
+
+    // this.world.createCollider(data.shape, data.body);
+    // this.dynamicBodies.push(data);
+    return data;
+
+    // const shape = new RapierShape(options.geometry || {}).get();
+    // console.log(options, shape);
     // // options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
     // options.body = new RapierBody().optionsMerge(options.body || {});
     // let data = {};
@@ -560,18 +603,44 @@ class ThreeRapierFormatBase {
     };
   }
 
-  itemsTypes() {
+  typesMethods() {
     return {
       default: () => null,
     };
   }
 
-  get() {
-    const items = this.itemsTypes();
-    if (typeof items[this.options.type] == "undefined") {
+  typesArgs() {
+    return {
+      default: [],
+    };
+  }
+
+  typeMethodGet() {
+    const types = this.typesMethods();
+    if (typeof types[this.options.type] == "undefined") {
       throw new Error(`${this.name} "${this.options.type}" does not exists`);
     }
-    return items[this.options.type]();
+    return types[this.options.type];
+  }
+
+  typeArgsGet() {
+    const args = this.typesArgs();
+    if (typeof args[this.options.type] == "undefined") {
+      throw new Error(
+        `${this.name}: Argument "${this.options.type}" does not exists`
+      );
+    }
+    return args[this.options.type];
+  }
+
+  typeMethodCall(...args) {
+    return this.typeMethodGet()(...args);
+  }
+
+  get() {
+    const method = this.typeMethodGet();
+    const args = this.typeArgsGet();
+    return method(...args);
   }
 }
 
@@ -589,21 +658,21 @@ class ThreeGeometry extends ThreeRapierFormatBase {
       depth: 1,
     };
   }
-  itemsTypes() {
+  typesMethods() {
     return {
-      capsule: () =>
-        new THREE.CapsuleGeometry(
-          this.options.radius,
-          this.options.length,
-          this.options.capSegments,
-          this.options.radialSegments
-        ),
-      cube: () =>
-        new THREE.BoxGeometry(
-          this.options.width,
-          this.options.height,
-          this.options.depth
-        ),
+      capsule: (...args) => new THREE.CapsuleGeometry(...args),
+      cube: (...args) => new THREE.BoxGeometry(...args),
+    };
+  }
+  typesArgs() {
+    return {
+      capsule: [
+        this.options.radius,
+        this.options.length,
+        this.options.capSegments,
+        this.options.radialSegments,
+      ],
+      cube: [this.options.width, this.options.height, this.options.depth],
     };
   }
 }
@@ -616,10 +685,14 @@ class ThreeMaterial extends ThreeRapierFormatBase {
       color: 0xffffff,
     };
   }
-  itemsTypes() {
+  typesMethods() {
     return {
-      basic: () =>
-        new THREE.MeshBasicMaterial({ ...this.options, type: undefined }),
+      basic: (...args) => new THREE.MeshBasicMaterial(...args),
+    };
+  }
+  typesArgs() {
+    return {
+      basic: [{ ...this.options, type: undefined }],
     };
   }
 }
@@ -638,20 +711,22 @@ class RapierShape extends ThreeRapierFormatBase {
       depth: 1,
     };
   }
-  itemsTypes() {
+  typesMethods() {
     return {
-      capsule: () =>
-        RAPIER.ColliderDesc.capsule(
-          this.options.length / 2,
-          this.options.radius
-        ),
-      cube: () =>
-        RAPIER.ColliderDesc.cuboid(
-          this.options.width / 2,
-          this.options.height / 2,
-          this.options.depth / 2
-        ),
-      // trimesh: () => RAPIER.ColliderDesc.trimesh(),
+      capsule: (...args) => RAPIER.ColliderDesc.capsule(...args),
+      cube: (...args) => RAPIER.ColliderDesc.cuboid(...args),
+      trimesh: (...args) => RAPIER.ColliderDesc.trimesh(...args),
+    };
+  }
+  typesArgs() {
+    return {
+      capsule: [this.options.length / 2, this.options.radius],
+      cube: [
+        this.options.width / 2,
+        this.options.height / 2,
+        this.options.depth / 2,
+      ],
+      trimesh: [],
     };
   }
 }
@@ -666,10 +741,23 @@ class RapierBody extends ThreeRapierFormatBase {
       canSleep: false,
     };
   }
-  itemsTypes() {
+  typesMethods() {
     return {
-      fixed: () => RAPIER.RigidBodyDesc.fixed(),
-      dynamic: () => RAPIER.RigidBodyDesc.dynamic(),
+      fixed: (...args) => RAPIER.RigidBodyDesc.fixed(...args),
+      dynamic: (...args) => RAPIER.RigidBodyDesc.dynamic(...args),
+    };
+  }
+  typesArgs() {
+    return {
+      fixed: [],
+      dynamic: [],
     };
   }
 }
+
+/**
+ * TODO: Criar class Physics, que será instanciada como scene.physics
+ * e irá tomar conta de todas as ações relacionadas a física, como
+ * metodo para adicionar elemento (mesh, body, shape), lista de elementos
+ * e update do motor de física.
+ */

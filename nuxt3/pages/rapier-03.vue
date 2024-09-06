@@ -5,6 +5,7 @@
       style="width: 100%; height: 400px; position: relative"
     ></div>
     <a href="">Refresh</a>
+    <div style="height: 100vh"></div>
   </nuxt-layout>
 </template>
 
@@ -20,7 +21,9 @@ class GameScene extends Scene {
         onLoad: (item) => {
           this.scene.add(item.model.scene);
           this.scriptAttach(item.model.scene, new SceneScript());
-          this.physicsAttach(item.model.scene);
+          this.coplexPhysicsAttach(item.model.scene, {
+            body: { type: "dynamic", mass: 1 },
+          });
         },
       },
     };
@@ -72,20 +75,21 @@ class WasdScript extends Script {
   }
 
   testInit() {
-    this.scene.basicMeshPhysicsAdd({
-      position: { x: -4, y: 0, z: 0 },
-      geometry: { type: "capsule", radius: 0.2, length: 1 },
-    });
-
-    this.scene.basicMeshPhysicsAdd({
-      position: { x: -2, y: 0, z: 0 },
-      geometry: {
-        type: "cube",
-        width: 0.6,
-        height: 0.6,
-        depth: 0.6,
-      },
-    });
+    // this.scene.basicMeshPhysicsAdd({
+    //   position: { x: -4, y: 0, z: 0 },
+    //   material: { type: "basic", color: 0xff0000 },
+    //   geometry: { type: "capsule", radius: 0.2, length: 1 },
+    // });
+    // this.scene.basicMeshPhysicsAdd({
+    //   position: { x: -2, y: 0, z: 0 },
+    //   material: { type: "basic", color: 0xff0000 },
+    //   geometry: {
+    //     type: "cube",
+    //     width: 0.6,
+    //     height: 0.6,
+    //     depth: 0.6,
+    //   },
+    // });
   }
 }
 
