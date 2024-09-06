@@ -226,6 +226,8 @@ export const Scene = class Scene {
       { type: "mouse", name: "mousemove" },
       { type: "mouse", name: "pointermove" },
       { type: "mouse", name: "pointerdown" },
+      { type: "mouse", name: "pointerout" },
+      { type: "mouse", name: "pointerlockchange" },
       { type: "keyboard", name: "keyup" },
       { type: "keyboard", name: "keydown" },
     ];
@@ -309,6 +311,95 @@ export const Scene = class Scene {
     });
 
     return controls;
+  }
+
+  getPointerLockControls(options = {}) {
+    const controls = new Proxy(
+      {
+        target: null,
+        pointerSpeed: 1,
+        minPolarAngle: 0,
+        maxPolarAngle: Math.PI,
+        updateAxisX: true,
+        updateAxisY: true,
+
+        ...options,
+
+        locked: false,
+        script: this,
+        lock() {
+          this.script.canvas.el.requestPointerLock();
+        },
+        moveForward(speed) {
+          const target = controls.target;
+          const _vector = new THREE.Vector3();
+          _vector.setFromMatrixColumn(target.matrix, 0);
+          _vector.crossVectors(target.up, _vector);
+          target.position.addScaledVector(_vector, speed);
+        },
+        moveRight(speed) {
+          const target = controls.target;
+          const _vector = new THREE.Vector3();
+          _vector.setFromMatrixColumn(target.matrix, 0);
+          target.position.addScaledVector(_vector, speed);
+        },
+      },
+      {
+        get(target, name) {
+          if (name == "locked") {
+            return !!document.pointerLockElement;
+          }
+          return target[name];
+        },
+      }
+    );
+
+    this.on("input.click", () => {
+      controls.lock();
+    });
+
+    this.on("input.pointermove", (ev) => {
+      if (!controls.locked) return;
+      if (!controls.target) return;
+
+      const _PI_2 = Math.PI / 2;
+      const object = controls.target;
+      const sensitivity = 0.002 * controls.pointerSpeed;
+
+      const _euler = new THREE.Euler(0, 0, 0, "YXZ");
+      _euler.setFromQuaternion(object.quaternion);
+
+      if (controls.updateAxisY) {
+        _euler.y -= ev.movementX * sensitivity;
+      }
+
+      if (controls.updateAxisX) {
+        _euler.x -= ev.movementY * sensitivity;
+        _euler.x = Math.max(
+          _PI_2 - controls.maxPolarAngle,
+          Math.min(_PI_2 - controls.minPolarAngle, _euler.x)
+        );
+      }
+
+      object.quaternion.setFromEuler(_euler);
+    });
+
+    return controls;
+  }
+
+  getInputsControl(inputs = {}) {
+    let defaults = {};
+    for (let name in inputs) {
+      defaults[name] = inputs[name]({ type: null });
+    }
+
+    this.on("input", (ev) => {
+      for (let name in inputs) {
+        defaults[name] = inputs[name](ev);
+      }
+    });
+
+    return defaults;
   }
 
   scripts = [];

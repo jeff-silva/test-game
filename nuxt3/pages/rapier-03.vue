@@ -25,23 +25,51 @@ class GameScene extends Scene {
   }
 
   onCreate() {
-    // this.on("input", (ev) => {
-    //   console.log(ev);
-    // });
+    this.scriptAttach(this.camera, new WasdScript());
   }
 }
 
 class SceneScript extends Script {
-  onUpdate() {
-    //
+  onCreate() {
+    this.scene.camera.position.set(-3, 0, 2);
+  }
+}
+
+class WasdScript extends Script {
+  onCreate() {
+    this.pointerLockControlsInit();
+    this.movementControlsInit();
+  }
+
+  pointerLockControlsInit() {
+    this.pointerLock = this.scene.getPointerLockControls({
+      target: this.scene.camera,
+      pointerSpeed: 0.4,
+    });
+  }
+
+  movementControlsInit() {
+    this.move = this.scene.getInputsControl({
+      front(ev) {
+        if (ev.type == "keydown" && ev.key == "w") return 1;
+        if (ev.type == "keydown" && ev.key == "s") return -1;
+        return 0;
+      },
+      right(ev) {
+        if (ev.type == "keydown" && ev.key == "a") return -1;
+        if (ev.type == "keydown" && ev.key == "d") return 1;
+        return 0;
+      },
+    });
+
+    this.scene.on("update", () => {
+      this.pointerLock.moveForward(this.move.front / 20);
+      this.pointerLock.moveRight(this.move.right / 20);
+    });
   }
 }
 
 const game = new GameScene({ el: "#game", debug: true });
-
-// game.on("loadProgress", (data) => {
-//   console.log(data.progress);
-// });
 
 game.on("destroy", () => {
   location.reload();
