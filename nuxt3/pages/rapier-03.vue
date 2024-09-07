@@ -31,8 +31,16 @@ class GameScene extends Scene {
   onCreate() {
     this.scriptAttach(this.camera, new WasdScript());
     this.camera.position.set(-3, 0, 2);
-    this.player = this.physics.characterController();
     this.testInit();
+
+    this.player = this.physics.characterController();
+    console.log(this.player);
+
+    this.on("update", () => {
+      if (this.input.keyboard.e) {
+        console.log(this.player.move);
+      }
+    });
   }
 
   testInit() {

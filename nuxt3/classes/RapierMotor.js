@@ -794,7 +794,31 @@ class Physics {
       }
 
       move(desiredTranslation) {
-        console.log("move");
+        let rigidBody = parent.world.createRigidBody(
+          new RAPIER.RigidBodyDesc(
+            RAPIER.RigidBodyType["KinematicPositionBased"]
+          )
+        );
+        const collider = parent.world.createCollider(
+          new RAPIER.ColliderDesc(new RAPIER.Cuboid(0.5, 0.5, 0.5)),
+          rigidBody
+        );
+
+        let velocity = new THREE.Vector3();
+        velocity.x += 1;
+
+        this.controller.computeColliderMovement(collider, velocity);
+
+        // (optional) Check collisions
+        for (var i = 0; i < controller.numComputedCollisions(); i++) {
+          let collision = controller.computedCollision(i);
+        }
+
+        // Calculate next translation from computed movement
+        movement.copy(controller.computedMovement());
+        nextTranslation.copy(rigidBody.translation());
+        nextTranslation.add(movement);
+        rigidBody.setNextKinematicTranslation(nextTranslation);
       }
     })(this);
   }
