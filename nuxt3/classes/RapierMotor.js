@@ -307,8 +307,12 @@ export const Scene = class Scene {
 
       this.dynamicBodies.map(({ mesh, body, shape }) => {
         if (!body) return;
-        mesh.position.copy(body.translation());
-        mesh.quaternion.copy(body.rotation());
+        if (typeof body.translation == "function") {
+          mesh.position.copy(body.translation());
+        }
+        if (typeof body.rotation == "function") {
+          mesh.quaternion.copy(body.rotation());
+        }
       });
 
       const delta = this.clock.getDelta();
@@ -515,28 +519,44 @@ export const Scene = class Scene {
   }
 
   coplexPhysicsAttach(mesh, options = {}) {
-    let rets = [];
-
     options.body = new RapierBody().optionsMerge(options.body || {});
-    const body = new RapierBody(options.body).get();
+
+    let data = { mesh };
+
+    console.log(JSON.stringify(options, null, 2));
+
+    // // Funcionando
+    // data.body = this.world.createRigidBody(
+    //   RAPIER.RigidBodyDesc.dynamic().setCanSleep(false)
+    // );
+
+    data.body = this.world.createRigidBody(new RapierBody(options.body).get());
+
+    let vertices = [];
+    let indices = [];
 
     mesh.traverse((child) => {
       if (!child.isMesh) return;
-      let data = { mesh, body };
 
-      let vertices = child.geometry.attributes.position.array;
-      let indices = child.geometry.index.array;
-      data.shape = RAPIER.ColliderDesc.trimesh(vertices, indices);
-
-      rets.push(data);
-      this.world.createCollider(data.shape, data.body);
-      this.dynamicBodies.push(data);
+      const geometry = child.geometry.clone();
+      geometry.applyMatrix4(child.matrixWorld);
+      geometry.computeVertexNormals();
+      vertices = [...vertices, ...geometry.attributes.position.array];
+      indices = [...indices, ...geometry.index.array];
     });
 
-    // const trimesh = new RAPIER.TriMesh(vertices, indices);
-    // data.shape = RAPIER.ColliderDesc.trimesh(trimesh);
-    // console.log(options, data);
-    return rets;
+    vertices = new Float32Array(vertices);
+    indices = new Uint32Array(indices);
+
+    data.shape = RAPIER.ColliderDesc.trimesh(
+      new Float32Array(vertices),
+      new Uint32Array(indices)
+    ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+
+    this.world.createCollider(data.shape, data.body);
+    this.dynamicBodies.push(data);
+
+    return data;
   }
 
   physicsAttach(mesh, options = {}) {
@@ -700,16 +720,7 @@ class ThreeMaterial extends ThreeRapierFormatBase {
 class RapierShape extends ThreeRapierFormatBase {
   name = "Rapier Shape";
   optionsDefault() {
-    return {
-      type: null,
-      radius: 1,
-      length: 1,
-      capSegments: 4,
-      radialSegments: 8,
-      width: 1,
-      height: 1,
-      depth: 1,
-    };
+    return new ThreeGeometry().optionsDefault();
   }
   typesMethods() {
     return {

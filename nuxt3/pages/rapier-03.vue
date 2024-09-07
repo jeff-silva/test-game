@@ -20,9 +20,8 @@ class GameScene extends Scene {
         url: "assets/threejs/models/low-poly-level/scene.gltf",
         onLoad: (item) => {
           this.scene.add(item.model.scene);
-          this.scriptAttach(item.model.scene, new SceneScript());
           this.coplexPhysicsAttach(item.model.scene, {
-            body: { type: "dynamic", mass: 1 },
+            body: { type: "fixed", mass: 100 },
           });
         },
       },
@@ -31,13 +30,7 @@ class GameScene extends Scene {
 
   onCreate() {
     this.scriptAttach(this.camera, new WasdScript());
-  }
-}
-
-// Script that controls the scene
-class SceneScript extends Script {
-  onCreate() {
-    this.scene.camera.position.set(-3, 0, 2);
+    this.camera.position.set(-3, 0, 2);
   }
 }
 
@@ -75,21 +68,22 @@ class WasdScript extends Script {
   }
 
   testInit() {
-    // this.scene.basicMeshPhysicsAdd({
-    //   position: { x: -4, y: 0, z: 0 },
-    //   material: { type: "basic", color: 0xff0000 },
-    //   geometry: { type: "capsule", radius: 0.2, length: 1 },
-    // });
-    // this.scene.basicMeshPhysicsAdd({
-    //   position: { x: -2, y: 0, z: 0 },
-    //   material: { type: "basic", color: 0xff0000 },
-    //   geometry: {
-    //     type: "cube",
-    //     width: 0.6,
-    //     height: 0.6,
-    //     depth: 0.6,
-    //   },
-    // });
+    this.scene.basicMeshPhysicsAdd({
+      position: { x: -4, y: 0, z: 0 },
+      material: { type: "basic", color: 0xff0000 },
+      geometry: { type: "capsule", radius: 0.2, length: 1 },
+    });
+
+    this.scene.basicMeshPhysicsAdd({
+      position: { x: -2, y: 0, z: 0 },
+      material: { type: "basic", color: 0xff0000 },
+      geometry: {
+        type: "cube",
+        width: 0.6,
+        height: 0.6,
+        depth: 0.6,
+      },
+    });
   }
 }
 
