@@ -4,39 +4,6 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-export const Debug = class Debug {
-  mesh;
-  world;
-  enabled = true;
-
-  constructor(scene, world) {
-    this.world = world;
-    this.mesh = new THREE.LineSegments(
-      new THREE.BufferGeometry(),
-      new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true })
-    );
-    this.mesh.frustumCulled = false;
-    scene.add(this.mesh);
-  }
-
-  update() {
-    if (this.enabled) {
-      const { vertices, colors } = this.world.debugRender();
-      this.mesh.geometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(vertices, 3)
-      );
-      this.mesh.geometry.setAttribute(
-        "color",
-        new THREE.BufferAttribute(colors, 4)
-      );
-      this.mesh.visible = true;
-    } else {
-      this.mesh.visible = false;
-    }
-  }
-};
-
 export const Scene = class Scene {
   options = {
     el: null,
@@ -55,9 +22,9 @@ export const Scene = class Scene {
   renderer = null;
   debug = null;
   world = null;
-  dynamicBodies = [];
   THREE = null;
   RAPIER = null;
+  physics = null;
 
   events = [];
   scripts = [];
@@ -87,7 +54,7 @@ export const Scene = class Scene {
       setTimeout(async () => {
         await RAPIER.init();
         await this.initCanvas();
-        await this.initGame();
+        await this.initThreejs();
         await this.initRapier();
         await this.initPreload();
         await this.initCanvas();
@@ -124,7 +91,7 @@ export const Scene = class Scene {
     }
   }
 
-  async initGame() {
+  async initThreejs() {
     if (!this.scene) {
       this.scene = new THREE.Scene();
       this.scene.name = this.scene.name || "Main Scene";
@@ -150,16 +117,9 @@ export const Scene = class Scene {
   }
 
   async initRapier() {
-    this.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
-
-    if (this.options.debug) {
-      this.debug = new Debug(this.scene, this.world);
-    }
-
-    this.on("update", () => {
-      if (this.debug && this.world) {
-        this.debug.update();
-      }
+    this.physics = new Physics({
+      debug: this.options.debug,
+      scene: this.scene,
     });
   }
 
@@ -305,19 +265,7 @@ export const Scene = class Scene {
         script.onUpdate();
       });
 
-      this.dynamicBodies.map(({ mesh, body, shape }) => {
-        if (!body) return;
-        if (typeof body.translation == "function") {
-          mesh.position.copy(body.translation());
-        }
-        if (typeof body.rotation == "function") {
-          mesh.quaternion.copy(body.rotation());
-        }
-      });
-
-      const delta = this.clock.getDelta();
-      this.world.timestep = Math.min(delta, 0.1);
-      this.world.step();
+      this.physics.update();
 
       // this.renderer.domElement.style.width = "100%";
       // this.renderer.domElement.style.height = "100%";
@@ -464,8 +412,8 @@ export const Scene = class Scene {
     data = callback(data);
 
     this.scene.add(data.mesh);
-    this.world.createCollider(data.shape, data.body);
-    this.dynamicBodies.push(data);
+
+    this.physics.dynamicBodyAdd(data);
   }
 
   basicMeshPhysicsAdd(options = {}) {
@@ -497,7 +445,7 @@ export const Scene = class Scene {
       options.position.z
     );
 
-    data.body = this.world.createRigidBody(
+    data.body = this.physics.world.createRigidBody(
       body
         .setCanSleep(options.body.canSleep)
         .setTranslation(
@@ -512,8 +460,7 @@ export const Scene = class Scene {
       .setRestitution(options.body.restitution);
 
     this.scene.add(data.mesh);
-    this.world.createCollider(data.shape, data.body);
-    this.dynamicBodies.push(data);
+    this.physics.dynamicBodyAdd(data);
 
     return data;
   }
@@ -530,7 +477,9 @@ export const Scene = class Scene {
     //   RAPIER.RigidBodyDesc.dynamic().setCanSleep(false)
     // );
 
-    data.body = this.world.createRigidBody(new RapierBody(options.body).get());
+    data.body = this.physics.world.createRigidBody(
+      new RapierBody(options.body).get()
+    );
 
     let vertices = [];
     let indices = [];
@@ -553,42 +502,9 @@ export const Scene = class Scene {
       new Uint32Array(indices)
     ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
 
-    this.world.createCollider(data.shape, data.body);
-    this.dynamicBodies.push(data);
+    this.physics.dynamicBodyAdd(data);
 
     return data;
-  }
-
-  physicsAttach(mesh, options = {}) {
-    options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
-    options.body = new RapierBody().optionsMerge(options.body || {});
-
-    let data = {};
-    data.mesh = mesh;
-    data.body = new RapierBody(options.body).get();
-    data.shape = new RapierShape(options.geometry).get();
-
-    console.log(options);
-    console.log(data);
-
-    // this.world.createCollider(data.shape, data.body);
-    // this.dynamicBodies.push(data);
-    return data;
-
-    // const shape = new RapierShape(options.geometry || {}).get();
-    // console.log(options, shape);
-    // // options.geometry = new ThreeGeometry().optionsMerge(options.geometry || {});
-    // options.body = new RapierBody().optionsMerge(options.body || {});
-    // let data = {};
-    // data.mesh = mesh;
-    // data.body = undefined;
-    // data.shape = undefined;
-    // // const shape = new RapierShape(options.geometry).get();
-    // // const body = new RapierBody(options.body).get();
-    // console.log(options);
-    // this.world.createCollider(data.shape, data.body);
-    // this.dynamicBodies.push(data);
-    // return data;
   }
 
   onCreate() {}
@@ -766,9 +682,84 @@ class RapierBody extends ThreeRapierFormatBase {
   }
 }
 
-/**
- * TODO: Criar class Physics, que será instanciada como scene.physics
- * e irá tomar conta de todas as ações relacionadas a física, como
- * metodo para adicionar elemento (mesh, body, shape), lista de elementos
- * e update do motor de física.
- */
+export const Debug = class Debug {
+  mesh;
+  world;
+  enabled = true;
+
+  constructor(scene, world) {
+    this.world = world;
+    this.mesh = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true })
+    );
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  update() {
+    if (this.enabled) {
+      const { vertices, colors } = this.world.debugRender();
+      this.mesh.geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(vertices, 3)
+      );
+      this.mesh.geometry.setAttribute(
+        "color",
+        new THREE.BufferAttribute(colors, 4)
+      );
+      this.mesh.visible = true;
+    } else {
+      this.mesh.visible = false;
+    }
+  }
+};
+
+class Physics {
+  debug = false;
+  clock = null;
+  scene = null;
+  world = null;
+  dynamicBodies = [];
+
+  constructor(options = {}) {
+    options = {
+      debug: false,
+      scene: null,
+      ...options,
+    };
+
+    this.clock = new THREE.Clock();
+    this.scene = options.scene;
+    this.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
+
+    if (options.debug) {
+      this.debug = new Debug(options.scene, this.world);
+    }
+  }
+
+  update() {
+    this.dynamicBodies.map(({ mesh, body, shape }) => {
+      if (!body) return;
+      if (typeof body.translation == "function") {
+        mesh.position.copy(body.translation());
+      }
+      if (typeof body.rotation == "function") {
+        mesh.quaternion.copy(body.rotation());
+      }
+    });
+
+    if (this.debug && this.world) {
+      this.debug.update();
+    }
+
+    const delta = this.clock.getDelta();
+    this.world.timestep = Math.min(delta, 0.1);
+    this.world.step();
+  }
+
+  dynamicBodyAdd({ mesh, body, shape }) {
+    const collider = this.world.createCollider(shape, body);
+    this.dynamicBodies.push({ collider, mesh, body, shape });
+  }
+}
