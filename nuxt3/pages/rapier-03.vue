@@ -31,6 +31,27 @@ class GameScene extends Scene {
   onCreate() {
     this.scriptAttach(this.camera, new WasdScript());
     this.camera.position.set(-3, 0, 2);
+    this.player = this.physics.characterController();
+    this.testInit();
+  }
+
+  testInit() {
+    this.basicMeshPhysicsAdd({
+      position: { x: -4, y: 0, z: 0 },
+      material: { type: "basic", color: 0xff0000 },
+      geometry: { type: "capsule", radius: 0.2, length: 1 },
+    });
+
+    this.basicMeshPhysicsAdd({
+      position: { x: -2, y: 0, z: 0 },
+      material: { type: "basic", color: 0xff0000 },
+      geometry: {
+        type: "cube",
+        width: 0.6,
+        height: 0.6,
+        depth: 0.6,
+      },
+    });
   }
 }
 
@@ -39,7 +60,6 @@ class WasdScript extends Script {
   onCreate() {
     this.pointerLockControlsInit();
     this.movementControlsInit();
-    this.testInit();
   }
 
   pointerLockControlsInit() {
@@ -64,25 +84,6 @@ class WasdScript extends Script {
       if (this.scene.input.keyboard.d) {
         this.pointerLock.moveRight(speed);
       }
-    });
-  }
-
-  testInit() {
-    this.scene.basicMeshPhysicsAdd({
-      position: { x: -4, y: 0, z: 0 },
-      material: { type: "basic", color: 0xff0000 },
-      geometry: { type: "capsule", radius: 0.2, length: 1 },
-    });
-
-    this.scene.basicMeshPhysicsAdd({
-      position: { x: -2, y: 0, z: 0 },
-      material: { type: "basic", color: 0xff0000 },
-      geometry: {
-        type: "cube",
-        width: 0.6,
-        height: 0.6,
-        depth: 0.6,
-      },
     });
   }
 }

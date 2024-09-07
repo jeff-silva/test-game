@@ -762,4 +762,73 @@ class Physics {
     const collider = this.world.createCollider(shape, body);
     this.dynamicBodies.push({ collider, mesh, body, shape });
   }
+
+  characterController() {
+    return new (class {
+      parent = null;
+      controller = null;
+      collider = null;
+
+      constructor(parent) {
+        this.parent = parent;
+
+        this.collider = (() => {
+          let rigidBodyDesc = new RAPIER.RigidBodyDesc(
+            RAPIER.RigidBodyType["KinematicPositionBased"]
+          );
+          let rigidBody = parent.world.createRigidBody(rigidBodyDesc);
+          let colliderDesc = new RAPIER.ColliderDesc(
+            new RAPIER.Cuboid(0.5, 0.5, 0.5)
+          );
+          return parent.world.createCollider(colliderDesc, rigidBody);
+        })();
+
+        this.controller = parent.world.createCharacterController(0.01);
+        this.controller.setSlideEnabled(true); // Allow sliding down hill
+        this.controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180); // Don’t allow climbing slopes larger than 45 degrees.
+        this.controller.setMinSlopeSlideAngle((30 * Math.PI) / 180); // Automatically slide down on slopes smaller than 30 degrees.
+        this.controller.enableAutostep(0.5, 0.2, true); // (maxHeight, minWidth, includeDynamicBodies) Stair behavior
+        this.controller.enableSnapToGround(0.5); // (distance) Set ground snap behavior
+        this.controller.setApplyImpulsesToDynamicBodies(true); // Add push behavior
+        this.controller.setCharacterMass(1);
+      }
+
+      move(desiredTranslation) {
+        console.log("move");
+      }
+    })(this);
+  }
 }
+
+/**
+ * TODO: Refazer toda a classe
+ *
+ * Organizar todas as classes de forma
+ * que o motor fique basicamente assim:
+ *
+ * class Scene
+ * {
+ *  constructor(options = {}) {
+ *    this.input = new Input(this, {});
+ *    this.canvas = new Canvas(this, {});
+ *    this.game = new Game(this, {});
+ *    this.physics = new Physics(this, { debug: options.debug });
+ *    this.events = new Events(this, {});
+ *  }
+ *
+ *  update() {
+ *    this.input.update();
+ *    this.canvas.update();
+ *    this.game.update();
+ *    this.physics.update();
+ *    this.events.update();
+ *  }
+ * }
+ *
+ * class Object {}
+ *
+ * class Script {}
+ *
+ * - Os objetos de cena serão as classes Object
+ * - Os scripts serão associados aos objetos e não mais as meshes
+ */
