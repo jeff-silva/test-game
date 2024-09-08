@@ -32,17 +32,16 @@ class Level extends Instance {
   onCreate() {
     const object = this.parent.preload.files.level.model.scene;
     this.parent.game.scene.add(object);
-    this.pointerLock = this.parent.game.getPointerLockControls({
-      target: object,
-    });
   }
 }
 
 class Player extends Instance {
-  // onCreate() {
-  //   console.log("im player");
-  // }
-  //
+  onCreate() {
+    // this.pointerLock = this.parent.game.getPointerLockControls({
+    //   target: object,
+    // });
+  }
+
   // onUpdate() {
   //   console.log(this.scene.input.keyboard);
   // }
