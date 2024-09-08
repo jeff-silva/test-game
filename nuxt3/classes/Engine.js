@@ -266,18 +266,21 @@ class Canvas extends Base {
   height = 0;
 
   onCreate() {
-    if (!this.el) {
-      const { options } = this.parent;
-      this.el = document.querySelector(options.el);
-      window.addEventListener("resize", this.onResizeHandler);
-    }
+    const { options } = this.parent;
+    this.el = document.querySelector(options.el);
+    this.resizeHandler();
+
+    window.addEventListener("resize", () => {
+      this.resizeHandler();
+
+      this.parent.event.dispatch("canvas.resize", {
+        width: this.width,
+        height: this.height,
+      });
+    });
   }
 
-  onDestroy() {
-    window.removeEventListener("resize", this.onResizeHandler);
-  }
-
-  onResizeHandler() {
+  resizeHandler() {
     this.width = this.el.offsetWidth;
     this.height = this.el.offsetHeight;
   }
@@ -299,10 +302,22 @@ class Game extends Base {
     canvas.el.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = "100%";
     this.renderer.domElement.style.height = "100%";
+
+    this.resizeHandler(width, height);
+
+    this.parent.event.on("canvas.resize", ({ width, height }) => {
+      this.resizeHandler(width, height);
+    });
   }
 
   onUpdate() {
     this.renderer.render(this.scene, this.camera);
+  }
+
+  resizeHandler(width, height) {
+    this.renderer.setSize(width, height);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
   }
 
   getPointerLockControls(options = {}) {
