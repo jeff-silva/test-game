@@ -4,4 +4,4 @@ export default defineNuxtConfig({
   app: { baseURL: '/test-game/' },
   devtools: { enabled: true },
   ssr: false,
-})
+});
