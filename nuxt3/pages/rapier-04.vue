@@ -14,7 +14,7 @@ import { Scene, Instance, Script } from "@/classes/Engine.js";
 const app = useApp();
 
 class GameScene extends Scene {
-  preload() {
+  preloadFiles() {
     return {
       scene: {
         url: app.baseUrl("assets/threejs/models/low-poly-level/scene.gltf"),

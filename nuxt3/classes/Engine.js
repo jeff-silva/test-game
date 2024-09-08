@@ -18,6 +18,7 @@ export const Scene = class Scene {
       ...this.options,
       ...options,
     };
+    this.preload = new Preload(this, {});
     this.event = new Event(this, {});
     this.input = new Input(this, {});
     this.canvas = new Canvas(this, {
@@ -30,7 +31,7 @@ export const Scene = class Scene {
   init() {
     setTimeout(async () => {
       await RAPIER.init();
-      await this.preloadInit();
+      await this.preload.init(this.preloadFiles());
       this.create();
       this.update();
     }, 10);
@@ -80,78 +81,8 @@ export const Scene = class Scene {
   onUpdate() {}
   onDestroy() {}
 
-  preload() {
+  preloadFiles() {
     return {};
-  }
-
-  preloadInit() {
-    return new Promise((resolve, reject) => {
-      console.log(this.preload());
-      resolve();
-
-      // const config = useRuntimeConfig();
-      // const manager = Object.assign(new THREE.LoadingManager(), {
-      //   onProgress: (url, itemsLoaded, itemsTotal) => {
-      //     const progress = (itemsLoaded / itemsTotal) * 100;
-      //     this.dispatch("loadProgress", {
-      //       progress,
-      //       url,
-      //       itemsLoaded,
-      //       itemsTotal,
-      //     });
-      //   },
-      //   onLoad: () => {
-      //     this.dispatch("loadSuccess");
-      //     resolve();
-      //   },
-      // });
-
-      // const modelLoaders = {
-      //   gltf: (item) => {
-      //     return new GLTFLoader(manager).load(item.url, (gltf) => {
-      //       item.loaded = true;
-      //       item.model = gltf;
-      //       item.onLoad(item);
-      //     });
-      //   },
-      // };
-
-      // let preload = this.preload();
-
-      // Object.entries(preload).map(([name, item]) => {
-      //   item = {
-      //     name,
-      //     onLoad: () => null,
-      //     ...item,
-      //     ext: item.url.split("?").at(0).split(".").at(-1),
-      //     loaded: false,
-      //     model: null,
-      //   };
-
-      //   if (!item.url.startsWith("http")) {
-      //     const u = new URL(location.href);
-      //     const itemPath = item.url;
-      //     item.url = u.origin;
-      //     if (config.app.baseURL) {
-      //       if (!config.app.baseURL.startsWith("/")) {
-      //         item.url += "/";
-      //       }
-      //       item.url += config.app.baseURL;
-      //       if (
-      //         !config.app.baseURL.endsWith("/") &&
-      //         !itemPath.startsWith("/")
-      //       ) {
-      //         item.url += "/";
-      //       }
-      //       item.url += itemPath;
-      //     }
-      //   }
-
-      //   if (typeof modelLoaders[item.ext] == "function") {
-      //     modelLoaders[item.ext](item);
-      //   }
-      // });
-    });
   }
 
   instanceAdd(instance) {
@@ -189,6 +120,50 @@ class Base {
   onCreate() {}
   onUpdate() {}
   onDestroy() {}
+}
+
+class Preload extends Base {
+  files = {};
+
+  init(files = {}) {
+    return new Promise((resolve, reject) => {
+      const modelLoaders = {
+        gltf: (item) => {
+          return new GLTFLoader(manager).load(item.url, (gltf) => {
+            item.loaded = true;
+            item.model = gltf;
+          });
+        },
+      };
+
+      const manager = Object.assign(new THREE.LoadingManager(), {
+        onProgress: (url, itemsLoaded, itemsTotal) => {
+          const progress = (itemsLoaded / itemsTotal) * 100;
+          this.parent.event.dispatch("preload.loading.progress", {
+            progress,
+            url,
+            itemsLoaded,
+            itemsTotal,
+          });
+        },
+        onLoad: () => {
+          this.parent.event.dispatch("preload.loading.success");
+          resolve();
+        },
+      });
+
+      Object.entries(files).map(([name, item]) => {
+        item.name = name;
+        item.loaded = false;
+        item.ext = item.url.split("?").at(0).split(".").at(-1);
+        item.content = null;
+
+        if (typeof modelLoaders[item.ext] == "function") {
+          modelLoaders[item.ext](item);
+        }
+      });
+    });
+  }
 }
 
 class Event extends Base {
