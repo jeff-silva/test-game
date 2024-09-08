@@ -18,14 +18,21 @@ export const Scene = class Scene {
       ...this.options,
       ...options,
     };
-    this.preload = new Preload(this, {});
-    this.event = new Event(this, {});
-    this.input = new Input(this, {});
-    this.canvas = new Canvas(this, {
-      el: this.options.el,
+
+    this.extensions().map((item) => {
+      this[item.name] = new item.class(this);
     });
-    this.game = new Game(this, {});
-    this.physics = new Physics(this, {});
+  }
+
+  extensions() {
+    return [
+      { name: "preload", class: Preload },
+      { name: "event", class: Event },
+      { name: "input", class: Input },
+      { name: "canvas", class: Canvas },
+      { name: "game", class: Game },
+      { name: "physics", class: Physics },
+    ];
   }
 
   init() {
@@ -38,11 +45,10 @@ export const Scene = class Scene {
   }
 
   create() {
-    this.event.onCreate();
-    this.input.onCreate();
-    this.canvas.onCreate();
-    this.game.onCreate();
-    this.physics.onCreate();
+    this.extensions().map((item) => {
+      this[item.name]["onCreate"]();
+    });
+
     this.onCreate();
     this.event.dispatch("create");
     this.instances.map((instance) => {
@@ -51,11 +57,10 @@ export const Scene = class Scene {
   }
 
   update() {
-    this.event.onUpdate();
-    this.input.onUpdate();
-    this.canvas.onUpdate();
-    this.game.onUpdate();
-    this.physics.onUpdate();
+    this.extensions().map((item) => {
+      this[item.name]["onUpdate"]();
+    });
+
     this.onUpdate();
     this.event.dispatch("update");
     this.instances.map((instance) => {
@@ -65,11 +70,10 @@ export const Scene = class Scene {
   }
 
   destroy() {
-    this.event.onDestroy();
-    this.input.onDestroy();
-    this.canvas.onDestroy();
-    this.game.onDestroy();
-    this.physics.onDestroy();
+    this.extensions().map((item) => {
+      this[item.name]["onDestroy"]();
+    });
+
     this.onDestroy();
     this.event.dispatch("destroy");
     this.instances.map((instance) => {
@@ -86,35 +90,28 @@ export const Scene = class Scene {
   }
 
   instanceAdd(instance) {
-    instance.scene = this;
+    instance.parent = this;
     this.instances.push(instance);
   }
 };
 
 export const Instance = class Instance {
-  scene = null;
+  parent = null;
   onCreate() {}
   onUpdate() {}
   onDestroy() {}
 };
 
 export const Script = class Script {
-  //
+  parent = null;
+  onCreate() {}
+  onUpdate() {}
+  onDestroy() {}
 };
 
 class Base {
-  options = {};
-
-  constructor(parent, options = {}) {
+  constructor(parent) {
     this.parent = parent;
-    this.options = {
-      ...this.optionsDefault(),
-      ...options,
-    };
-  }
-
-  optionsDefault() {
-    return {};
   }
 
   onCreate() {}
@@ -127,6 +124,10 @@ class Preload extends Base {
 
   init(files = {}) {
     return new Promise((resolve, reject) => {
+      if (Object.entries(files).length == 0) {
+        resolve();
+      }
+
       const modelLoaders = {
         gltf: (item) => {
           return new GLTFLoader(manager).load(item.url, (gltf) => {
@@ -161,6 +162,8 @@ class Preload extends Base {
         if (typeof modelLoaders[item.ext] == "function") {
           modelLoaders[item.ext](item);
         }
+
+        this.files[name] = item;
       });
     });
   }
@@ -205,6 +208,12 @@ class Input extends Base {
   }
 
   eventHandler(ev, evt) {
+    const eventKeys = [`input`, `input.${evt.type}`, `input.${ev.type}`];
+
+    eventKeys.map((eventKey) => {
+      this.parent.event.dispatch(eventKey, ev);
+    });
+
     if (ev.type == "keydown") {
       this.keyboard[ev.key] = true;
       this.keyboard[ev.code] = true;
@@ -256,15 +265,10 @@ class Canvas extends Base {
   width = 0;
   height = 0;
 
-  optionsDefault() {
-    return {
-      el: null,
-    };
-  }
-
   onCreate() {
     if (!this.el) {
-      this.el = document.querySelector(this.options.el);
+      const { options } = this.parent;
+      this.el = document.querySelector(options.el);
       window.addEventListener("resize", this.onResizeHandler);
     }
   }
@@ -300,6 +304,85 @@ class Game extends Base {
   onUpdate() {
     this.renderer.render(this.scene, this.camera);
   }
+
+  getPointerLockControls(options = {}) {
+    const controls = new Proxy(
+      {
+        target: null,
+        pointerSpeed: 1,
+        minPolarAngle: 0,
+        maxPolarAngle: Math.PI,
+        updateAxisX: true,
+        updateAxisY: true,
+
+        ...options,
+
+        locked: false,
+        script: this,
+        lock: () => {
+          this.parent.canvas.el.requestPointerLock();
+        },
+        moveForward(speed) {
+          const target = controls.target;
+          const _vector = new THREE.Vector3();
+          _vector.setFromMatrixColumn(target.matrix, 0);
+          _vector.crossVectors(target.up, _vector);
+          target.position.addScaledVector(_vector, speed);
+        },
+        moveRight(speed) {
+          const target = controls.target;
+          const _vector = new THREE.Vector3();
+          _vector.setFromMatrixColumn(target.matrix, 0);
+          target.position.addScaledVector(_vector, speed);
+        },
+      },
+      {
+        get(target, name) {
+          if (name == "locked") {
+            return !!document.pointerLockElement;
+          }
+          return target[name];
+        },
+      }
+    );
+
+    this.parent.event.on("input.click", (ev) => {
+      if (
+        this.parent.canvas.el == ev.target ||
+        this.parent.canvas.el.contains(ev.target)
+      ) {
+        controls.lock();
+      }
+    });
+
+    this.parent.event.on("input.pointermove", (ev) => {
+      if (!controls.locked) return;
+      if (!controls.target) return;
+
+      const _PI_2 = Math.PI / 2;
+      const object = controls.target;
+      const sensitivity = 0.002 * controls.pointerSpeed;
+
+      const _euler = new THREE.Euler(0, 0, 0, "YXZ");
+      _euler.setFromQuaternion(object.quaternion);
+
+      if (controls.updateAxisY) {
+        _euler.y -= ev.movementX * sensitivity;
+      }
+
+      if (controls.updateAxisX) {
+        _euler.x -= ev.movementY * sensitivity;
+        _euler.x = Math.max(
+          _PI_2 - controls.maxPolarAngle,
+          Math.min(_PI_2 - controls.minPolarAngle, _euler.x)
+        );
+      }
+
+      object.quaternion.setFromEuler(_euler);
+    });
+
+    return controls;
+  }
 }
 
 class Physics extends Base {
@@ -308,21 +391,12 @@ class Physics extends Base {
   world = null;
   dynamicBodies = [];
 
-  optionsDefault() {
-    return {
-      debug: false,
-    };
-  }
-
   onCreate() {
     this.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
 
-    // if (options.debug) {
-    //   this.debug = new Debug(options.scene, this.world);
-    // }
-
-    // console.log(this.options);
-    // console.log(this.parent.game.scene);
+    if (this.parent.options.debug) {
+      this.debug = new Debug(this.parent.game.scene, this.world);
+    }
   }
 
   onUpdate() {
@@ -336,7 +410,7 @@ class Physics extends Base {
       }
     });
 
-    if (this.debug && this.world) {
+    if (this.parent.options.debug && this.debug && this.world) {
       this.debug.update();
     }
 
@@ -408,5 +482,38 @@ class Physics extends Base {
         rigidBody.setNextKinematicTranslation(nextTranslation);
       }
     })(this);
+  }
+}
+
+class Debug {
+  mesh;
+  world;
+  enabled = true;
+
+  constructor(scene, world) {
+    this.world = world;
+    this.mesh = new THREE.LineSegments(
+      new THREE.BufferGeometry(),
+      new THREE.LineBasicMaterial({ color: 0xffffff, vertexColors: true })
+    );
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  update() {
+    if (this.enabled) {
+      const { vertices, colors } = this.world.debugRender();
+      this.mesh.geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(vertices, 3)
+      );
+      this.mesh.geometry.setAttribute(
+        "color",
+        new THREE.BufferAttribute(colors, 4)
+      );
+      this.mesh.visible = true;
+    } else {
+      this.mesh.visible = false;
+    }
   }
 }

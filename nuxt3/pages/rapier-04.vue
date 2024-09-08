@@ -16,21 +16,36 @@ const app = useApp();
 class GameScene extends Scene {
   preloadFiles() {
     return {
-      scene: {
+      level: {
         url: app.baseUrl("assets/threejs/models/low-poly-level/scene.gltf"),
       },
     };
   }
 
   onCreate() {
+    this.instanceAdd(new Level());
     this.instanceAdd(new Player());
   }
 }
 
-class Player extends Instance {
-  onUpdate() {
-    // console.log(this.scene.input.keyboard);
+class Level extends Instance {
+  onCreate() {
+    const object = this.parent.preload.files.level.model.scene;
+    this.parent.game.scene.add(object);
+    this.pointerLock = this.parent.game.getPointerLockControls({
+      target: object,
+    });
   }
+}
+
+class Player extends Instance {
+  // onCreate() {
+  //   console.log("im player");
+  // }
+  //
+  // onUpdate() {
+  //   console.log(this.scene.input.keyboard);
+  // }
 }
 
 const game = new GameScene({ el: "#game", debug: true });
