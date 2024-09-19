@@ -19,6 +19,7 @@
     "@types/matter-js": "^0.19.7",
     "@types/three": "^0.168.0",
     "enable3d": "^0.25.4",
+    "lodash": "^4.17.21",
     "matter-js": "^0.20.0",
     "phaser": "^3.80.1",
     "poly-decomp": "^0.3.0",

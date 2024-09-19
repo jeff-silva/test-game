@@ -23,28 +23,64 @@ class GameScene extends Scene {
   }
 
   onCreate() {
-    this.instanceAdd(new Level());
-    this.instanceAdd(new Player());
+    this.instanceAdd(new LevelInstance());
+    this.instanceAdd(new PlayerInstance());
+    this.instanceAdd(new TestInstance());
   }
 }
 
-class Level extends Instance {
+class LevelInstance extends Instance {
   onCreate() {
     const object = this.parent.preload.files.level.model.scene;
     this.parent.game.scene.add(object);
   }
 }
 
-class Player extends Instance {
+class PlayerInstance extends Instance {
   onCreate() {
-    // this.pointerLock = this.parent.game.getPointerLockControls({
-    //   target: object,
-    // });
+    this.pointerLock = this.parent.game.getPointerLockControls({
+      target: this.parent.game.camera,
+    });
   }
 
-  // onUpdate() {
-  //   console.log(this.scene.input.keyboard);
-  // }
+  onUpdate() {
+    const moveSpeed = 0.05;
+    if (this.parent.input.keyboard.w) {
+      this.pointerLock.moveForward(moveSpeed);
+    }
+    if (this.parent.input.keyboard.s) {
+      this.pointerLock.moveForward(-moveSpeed);
+    }
+    if (this.parent.input.keyboard.a) {
+      this.pointerLock.moveRight(-moveSpeed);
+    }
+    if (this.parent.input.keyboard.d) {
+      this.pointerLock.moveRight(moveSpeed);
+    }
+  }
+}
+
+class TestInstance extends Instance {
+  onCreate() {
+    const { THREE, scene } = this.parent.game;
+
+    // const geometry = new THREE.BoxGeometry(1, 1, 1);
+    // const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    // const cube = new THREE.Mesh(geometry, material);
+    // scene.add(cube);
+
+    // this.parent.physics.dynamicBasicMeshAdd({
+    //   material: { type: "matcap" },
+    //   geometry: { type: "capsule", radius: 0.5, length: 0.5 },
+    //   position: { x: -2, y: 0, z: 0 },
+    // });
+
+    this.parent.physics.dynamicBasicMeshAdd({
+      material: { type: "basic" },
+      geometry: { type: "box" },
+      position: { x: -2, y: 0, z: 0 },
+    });
+  }
 }
 
 const game = new GameScene({ el: "#game", debug: true });

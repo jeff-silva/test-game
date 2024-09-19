@@ -4,6 +4,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+import _ from "lodash";
+
 export const Scene = class Scene {
   options = {
     el: null,
@@ -13,7 +15,7 @@ export const Scene = class Scene {
   instances = [];
 
   constructor(options = {}) {
-    console.clear();
+    // console.clear();
     this.options = {
       ...this.options,
       ...options,
@@ -291,6 +293,9 @@ class Game extends Base {
     const { width, height } = this.parent.canvas;
     const { canvas } = this.parent;
 
+    this.THREE = THREE;
+    this.RAPIER = RAPIER;
+
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
     this.clock = new THREE.Clock();
@@ -324,7 +329,7 @@ class Game extends Base {
     const controls = new Proxy(
       {
         target: null,
-        pointerSpeed: 1,
+        pointerSpeed: 0.4,
         minPolarAngle: 0,
         maxPolarAngle: Math.PI,
         updateAxisX: true,
@@ -432,6 +437,202 @@ class Physics extends Base {
     const delta = this.parent.game.clock.getDelta();
     this.world.timestep = Math.min(delta, 0.1);
     this.world.step();
+  }
+
+  dynamicBasicMeshAdd(options = {}) {
+    // Configuration
+    options = _.merge(
+      {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { w: 0, x: 0, y: 0, z: 0 },
+        geometry: {
+          type: "box",
+          radius: 1,
+          length: 1,
+          capSegments: 4,
+          radialSegments: 8,
+          heightSegments: 1,
+          openEnded: false,
+          thetaStart: 0,
+          width: 1,
+          height: 1,
+          depth: 1,
+          thetaLength: Math.PI * 2,
+          radiusTop: 1,
+          radiusBottom: 1,
+          widthSegments: 32,
+          heightSegments: 16,
+          phiStart: 0,
+          phiLength: Math.PI * 2,
+        },
+        material: {
+          type: "basic",
+          color: 0xffffff,
+        },
+        physics: {
+          type: "dynamic",
+          mass: 1,
+        },
+      },
+      options
+    );
+
+    // Create geometry
+    const geometry = (() => {
+      let getOption = {
+        box: () =>
+          new THREE.BoxGeometry(
+            options.geometry.width,
+            options.geometry.height,
+            options.geometry.depth
+          ),
+        capsule: () =>
+          new THREE.CapsuleGeometry(
+            options.geometry.radius,
+            options.geometry.length,
+            options.geometry.capSegments,
+            options.geometry.radialSegments
+          ),
+        cone: () =>
+          new THREE.ConeGeometry(
+            options.geometry.radius,
+            options.geometry.height,
+            options.geometry.radialSegments,
+            options.geometry.heightSegments,
+            options.geometry.openEnded,
+            options.geometry.thetaStart,
+            options.geometry.thetaLength
+          ),
+        cylinder: () =>
+          new THREE.CylinderGeometry(
+            options.geometry.radiusTop,
+            options.geometry.radiusBottom,
+            options.geometry.height,
+            options.geometry.radialSegments,
+            options.geometry.heightSegments,
+            options.geometry.openEnded,
+            options.geometry.thetaStart,
+            options.geometry.thetaLength
+          ),
+        plane: () =>
+          new THREE.PlaneGeometry(
+            options.geometry.width,
+            options.geometry.height,
+            options.geometry.widthSegments,
+            options.geometry.heightSegments
+          ),
+        sphere: () =>
+          new THREE.SphereGeometry(
+            options.geometry.radius,
+            options.geometry.widthSegments,
+            options.geometry.heightSegments,
+            options.geometry.phiStart,
+            options.geometry.phiLength,
+            options.geometry.thetaStart,
+            options.geometry.thetaLength
+          ),
+      };
+
+      if (typeof getOption[options.geometry.type] != "function") {
+        throw new Error(`Geometry "${options.geometry.type}" does not exists`);
+      }
+
+      return getOption[options.geometry.type]();
+    })();
+
+    // Create material
+    const material = (() => {
+      const optionsMaterial = _.clone(options.material);
+      delete optionsMaterial.type;
+
+      let getOption = {
+        basic: () => new THREE.MeshBasicMaterial(optionsMaterial),
+        depth: () => new THREE.MeshDepthMaterial(optionsMaterial),
+        lambert: () => new THREE.MeshLambertMaterial({ optionsMaterial }),
+        matcap: () => new THREE.MeshMatcapMaterial({ optionsMaterial }),
+        normal: () => new THREE.MeshNormalMaterial({ optionsMaterial }),
+        phong: () => new THREE.MeshPhongMaterial({ optionsMaterial }),
+        physical: () => new THREE.MeshPhysicalMaterial({ optionsMaterial }),
+        standard: () => new THREE.MeshStandardMaterial({ optionsMaterial }),
+        toon: () => new THREE.MeshToonMaterial({ optionsMaterial }),
+      };
+
+      if (typeof getOption[options.material.type] != "function") {
+        throw new Error(`Material "${options.material.type}" does not exists`);
+      }
+
+      return getOption[options.material.type]();
+    })();
+
+    // Create mesh
+    const mesh = ((geometry, material) => {
+      let _mesh = new THREE.Mesh(geometry, material);
+      _mesh.position.set(
+        options.position.x,
+        options.position.y,
+        options.position.z
+      );
+
+      this.parent.game.scene.add(_mesh);
+      return _mesh;
+    })(geometry, material);
+
+    // Create body
+    const body = (() => {
+      let getOption = {
+        dynamic: () => RAPIER.RigidBodyDesc.dynamic(),
+        fixed: () => RAPIER.RigidBodyDesc.fixed(),
+      };
+
+      if (typeof getOption[options.physics.type] != "function") {
+        throw new Error(`Physics "${options.physics.type}" does not exists`);
+      }
+
+      let rigidBodyDesc = getOption[options.physics.type]()
+        .setTranslation(
+          options.position.x,
+          options.position.y,
+          options.position.z
+        )
+        .setRotation(options.rotation)
+        .setCanSleep(false);
+
+      return this.world.createRigidBody(rigidBodyDesc);
+    })();
+
+    // Create shape
+    const shape = (() => {
+      let getOption = {
+        box: () => RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5),
+        capsule: () => RAPIER.ColliderDesc.capsule(0.5, 0.2),
+        cone: () => null,
+        cylinder: () => null,
+        plane: () => null,
+        sphere: () => RAPIER.ColliderDesc.ball(1),
+      };
+
+      if (typeof getOption[options.geometry.type] != "function") {
+        throw new Error(`Geometry "${options.geometry.type}" does not exists`);
+      }
+
+      const _shape = getOption[options.geometry.type]();
+
+      if (!_shape) {
+        throw new Error(`Undefined shape "${options.geometry.type}"`);
+      }
+
+      // return new RAPIER.ColliderDesc(_shape);
+      return _shape.setMass(options.physics.mass).setRestitution(1.1);
+    })();
+
+    console.log(`
+      geometry:  ${options.geometry.type}
+      material:  ${options.material.type}
+      physics:   ${options.physics.type}
+        - mass:  ${options.physics.mass}
+    `);
+
+    return this.dynamicBodyAdd({ mesh, body, shape });
   }
 
   dynamicBodyAdd({ mesh, body, shape }) {
