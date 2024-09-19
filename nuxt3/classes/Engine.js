@@ -603,12 +603,21 @@ class Physics extends Base {
     // Create shape
     const shape = (() => {
       let getOption = {
-        box: () => RAPIER.ColliderDesc.cuboid(0.5, 0.5, 0.5),
-        capsule: () => RAPIER.ColliderDesc.capsule(0.5, 0.2),
+        box: () =>
+          RAPIER.ColliderDesc.cuboid(
+            options.geometry.width / 2,
+            options.geometry.height / 2,
+            options.geometry.depth / 2
+          ),
+        capsule: () =>
+          RAPIER.ColliderDesc.capsule(
+            options.geometry.radius / 3,
+            options.geometry.length
+          ),
         cone: () => null,
         cylinder: () => null,
         plane: () => null,
-        sphere: () => RAPIER.ColliderDesc.ball(1),
+        sphere: () => RAPIER.ColliderDesc.ball(options.geometry.radius),
       };
 
       if (typeof getOption[options.geometry.type] != "function") {
@@ -621,7 +630,6 @@ class Physics extends Base {
         throw new Error(`Undefined shape "${options.geometry.type}"`);
       }
 
-      // return new RAPIER.ColliderDesc(_shape);
       return _shape.setMass(options.physics.mass).setRestitution(1.1);
     })();
 
