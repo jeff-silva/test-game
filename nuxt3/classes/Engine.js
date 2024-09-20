@@ -439,8 +439,31 @@ class Physics extends Base {
     this.world.step();
   }
 
+  getThreejsGeometryOptions(options = {}) {
+    return {
+      type: "box",
+      radius: 1,
+      length: 1,
+      capSegments: 4,
+      radialSegments: 8,
+      heightSegments: 16,
+      openEnded: false,
+      thetaStart: 0,
+      width: 1,
+      height: 1,
+      depth: 1,
+      thetaLength: Math.PI * 2,
+      radiusTop: 1,
+      radiusBottom: 1,
+      widthSegments: 32,
+      phiStart: 0,
+      phiLength: Math.PI * 2,
+      ...options,
+    };
+  }
+
   getThreejsGeometry(options = {}) {
-    options = { type: "box", ...options };
+    options = this.getThreejsGeometryOptions(options);
     return {
       box: (options = {}) => {
         return new THREE.BoxGeometry(
@@ -502,8 +525,16 @@ class Physics extends Base {
     }[options.type](options);
   }
 
+  getThreejsMaterialOptions(options = {}) {
+    return {
+      type: "basic",
+      color: 0xffffff,
+      ...options,
+    };
+  }
+
   getThreejsMaterial(options = {}) {
-    options = { type: "basic", ...options };
+    options = this.getThreejsMaterialOptions(options);
 
     const opts = _.clone(options);
     delete opts.type;
@@ -521,20 +552,41 @@ class Physics extends Base {
     }[options.type](opts);
   }
 
-  getThreejsMesh(geometry, material, position = {}, rotation = {}) {
+  getThreejsMesh(geometry, material, options = {}) {
+    options = _.merge(
+      {
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0, w: 0 },
+      },
+      options
+    );
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(position.x || 0, position.y || 0, position.z || 0);
+    mesh.position.set(
+      options.position.x || 0,
+      options.position.y || 0,
+      options.position.z || 0
+    );
     mesh.quaternion.set(
-      rotation.x || 0,
-      rotation.y || 0,
-      rotation.z || 0,
-      rotation.w || 0
+      options.rotation.x || 0,
+      options.rotation.y || 0,
+      options.rotation.z || 0,
+      options.rotation.w || 0
     );
     return mesh;
   }
 
+  getRapierPhysicsOptions(options = {}) {
+    return {
+      type: "dynamic",
+      canSleep: false,
+      restitution: 1.1,
+      mass: 1,
+      ...options,
+    };
+  }
+
   getRapierBody(options = {}, position = {}, rotation = {}) {
-    options = { type: "dynamic", canSleep: false, ...options };
+    options = this.getRapierPhysicsOptions(options);
 
     let rigidBodyDesc = {
       dynamic: (options = {}) => {
@@ -554,8 +606,8 @@ class Physics extends Base {
   }
 
   getRapierShape(options = {}, geometry = {}) {
-    options = { mass: 1, restitution: 1.1, ...options };
-    geometry = { type: "box", ...geometry };
+    options = this.getRapierPhysicsOptions(options);
+    geometry = this.getThreejsGeometryOptions(geometry);
 
     let _shape = {
       box: (geometry = {}) => {
@@ -592,47 +644,16 @@ class Physics extends Base {
       {
         position: { x: 0, y: 0, z: 0 },
         rotation: { w: 0, x: 0, y: 0, z: 0 },
-        geometry: {
-          type: "box",
-          radius: 1,
-          length: 1,
-          capSegments: 4,
-          radialSegments: 8,
-          heightSegments: 1,
-          openEnded: false,
-          thetaStart: 0,
-          width: 1,
-          height: 1,
-          depth: 1,
-          thetaLength: Math.PI * 2,
-          radiusTop: 1,
-          radiusBottom: 1,
-          widthSegments: 32,
-          heightSegments: 16,
-          phiStart: 0,
-          phiLength: Math.PI * 2,
-        },
-        material: {
-          type: "basic",
-          color: 0xffffff,
-        },
-        physics: {
-          type: "dynamic",
-          canSleep: false,
-          mass: 1,
-        },
+        geometry: this.getThreejsGeometryOptions(),
+        material: this.getThreejsMaterialOptions(),
+        physics: this.getRapierPhysicsOptions(),
       },
       options
     );
 
     const geometry = this.getThreejsGeometry(options.geometry);
     const material = this.getThreejsMaterial(options.material);
-    const mesh = this.getThreejsMesh(
-      geometry,
-      material,
-      options.position,
-      options.rotation
-    );
+    const mesh = this.getThreejsMesh(geometry, material, options);
     this.parent.game.scene.add(mesh);
 
     const body = this.getRapierBody(
@@ -643,12 +664,12 @@ class Physics extends Base {
 
     const shape = this.getRapierShape(options.physics, options.geometry);
 
-    console.log(`
-      geometry:  ${options.geometry.type}
-      material:  ${options.material.type}
-      physics:   ${options.physics.type}
-        - mass:  ${options.physics.mass}
-    `);
+    // console.log(`
+    //   geometry:  ${options.geometry.type}
+    //   material:  ${options.material.type}
+    //   physics:   ${options.physics.type}
+    //     - mass:  ${options.physics.mass}
+    // `);
 
     return this.dynamicBodyAdd({ mesh, body, shape });
   }
