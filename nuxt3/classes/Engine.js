@@ -6,6 +6,20 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import _ from "lodash";
 
+_.mixin({
+  uuid: () => {
+    var d = _.now();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+      /[xy]/g,
+      function (c) {
+        var r = (d + _.random(16)) % 16 | 0;
+        d = Math.floor(d / 16);
+        return (c == "x" ? r : (r & 0x3) | 0x8).toString(16);
+      }
+    );
+  },
+});
+
 export const Scene = class Scene {
   options = {
     el: null,
@@ -629,6 +643,7 @@ class Physics extends Base {
       sphere: (geometry = {}) => {
         return RAPIER.ColliderDesc.ball(geometry.radius || 1);
       },
+      trimesh: (geometry = {}) => null,
     }[geometry.type](geometry);
 
     if (!_shape) {
@@ -674,21 +689,52 @@ class Physics extends Base {
     return this.dynamicBodyAdd({ mesh, body, shape });
   }
 
-  applyPhysicsBody(options = {}) {
+  applyPhysicsBodyTrimesh(options = {}) {
     options = _.merge(
       {
         object: null,
+        physics: this.getRapierPhysicsOptions(),
       },
       options
     );
 
-    console.log(options);
+    const mesh = options.object;
+    const body = this.getRapierBody(options.physics);
+
+    const shape = (() => {
+      let vertices = [];
+      let indices = [];
+
+      mesh.traverse((child) => {
+        if (!child.isMesh) return;
+
+        const geometry = child.geometry.clone();
+        geometry.applyMatrix4(child.matrixWorld);
+        geometry.computeVertexNormals();
+        vertices = [...vertices, ...geometry.attributes.position.array];
+        indices = [...indices, ...geometry.index.array];
+      });
+
+      vertices = new Float32Array(vertices);
+      indices = new Uint32Array(indices);
+
+      return RAPIER.ColliderDesc.trimesh(
+        new Float32Array(vertices),
+        new Uint32Array(indices)
+      ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    })();
+
+    console.log(options, this);
+    this.dynamicBodyAdd({ mesh, body, shape });
   }
 
   dynamicBodyAdd({ mesh, body, shape }) {
-    const uid = _.uniqueId("physic-body-");
     const collider = this.world.createCollider(shape, body);
-    this.dynamicBodies.push({ uid, collider, mesh, body, shape });
+    this.dynamicBodies.push({ uuid: _.uuid(), collider, mesh, body, shape });
+  }
+
+  dynamicBodyRemove(uuid) {
+    //
   }
 
   characterController() {

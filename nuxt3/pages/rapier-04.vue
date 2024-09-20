@@ -33,12 +33,16 @@ class LevelInstance extends Instance {
   onCreate() {
     const object = this.parent.preload.files.level.model.scene;
     this.parent.game.scene.add(object);
-    this.parent.physics.applyPhysicsBody({ object });
+    this.parent.physics.applyPhysicsBodyTrimesh({
+      object,
+      physics: { type: "fixed" },
+    });
   }
 }
 
 class PlayerInstance extends Instance {
   onCreate() {
+    this.parent.game.camera.position.set(-4, 0, 4);
     this.pointerLock = this.parent.game.getPointerLockControls({
       target: this.parent.game.camera,
     });
@@ -74,7 +78,7 @@ class TestInstance extends Instance {
       material: { type: "basic" },
       geometry: { type: "box" },
       position: { x: -2, y: 0, z: 0 },
-      physics: { type: "fixed" },
+      physics: { type: "dynamic" },
     });
 
     this.parent.physics.basicMeshAdd({
@@ -85,14 +89,14 @@ class TestInstance extends Instance {
         length: 0.5,
       },
       position: { x: -4, y: 0, z: 0 },
-      physics: { type: "fixed" },
+      physics: { type: "dynamic" },
     });
 
     this.parent.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "sphere", radius: 0.5 },
       position: { x: -6, y: 0, z: 0 },
-      physics: { type: "fixed" },
+      physics: { type: "dynamic" },
     });
   }
 }
