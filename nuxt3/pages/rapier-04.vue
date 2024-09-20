@@ -35,7 +35,7 @@ class LevelInstance extends Instance {
     this.parent.game.scene.add(object);
     this.parent.physics.applyPhysicsBodyTrimesh({
       object,
-      physics: { type: "fixed" },
+      physics: { type: "fixed", mass: 100 },
     });
   }
 }
@@ -77,8 +77,9 @@ class TestInstance extends Instance {
     this.parent.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "box" },
-      position: { x: -2, y: 0, z: 0 },
-      physics: { type: "dynamic" },
+      position: { x: -2, y: 0.5, z: 0 },
+      rotation: { x: 0.2, y: 0.2, z: 0.2 },
+      physics: { type: "dynamic", mass: 0.01 },
     });
 
     this.parent.physics.basicMeshAdd({
@@ -88,14 +89,16 @@ class TestInstance extends Instance {
         radius: 0.5,
         length: 0.5,
       },
-      position: { x: -4, y: 0, z: 0 },
+      position: { x: -4, y: 0.5, z: 0 },
+      rotation: { x: 0.2, y: 0.2, z: 0.2 },
       physics: { type: "dynamic" },
     });
 
     this.parent.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "sphere", radius: 0.5 },
-      position: { x: -6, y: 0, z: 0 },
+      position: { x: -6, y: 0.5, z: 0 },
+      rotation: { x: 0.2, y: 0.2, z: 0.2 },
       physics: { type: "dynamic" },
     });
   }

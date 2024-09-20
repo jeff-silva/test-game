@@ -423,7 +423,7 @@ class Physics extends Base {
   debug = false;
   scene = null;
   world = null;
-  dynamicBodies = [];
+  dynamicBodies = {};
 
   onCreate() {
     this.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
@@ -434,7 +434,8 @@ class Physics extends Base {
   }
 
   onUpdate() {
-    this.dynamicBodies.map(({ mesh, body, shape }) => {
+    for (let uuid in this.dynamicBodies) {
+      const { mesh, body, shape } = this.dynamicBodies[uuid];
       if (!body) return;
       if (typeof body.translation == "function") {
         mesh.position.copy(body.translation());
@@ -442,7 +443,7 @@ class Physics extends Base {
       if (typeof body.rotation == "function") {
         mesh.quaternion.copy(body.rotation());
       }
-    });
+    }
 
     if (this.parent.options.debug && this.debug && this.world) {
       this.debug.update();
@@ -626,24 +627,23 @@ class Physics extends Base {
     let _shape = {
       box: (geometry = {}) => {
         return RAPIER.ColliderDesc.cuboid(
-          (geometry.width || 1) / 2,
-          (geometry.height || 1) / 2,
-          (geometry.depth || 1) / 2
+          geometry.width / 2,
+          geometry.height / 2,
+          geometry.depth / 2
         );
       },
       capsule: (geometry = {}) => {
         return RAPIER.ColliderDesc.capsule(
-          (geometry.radius || 1) / 4,
-          geometry.length || 1
+          geometry.radius - 0.3,
+          geometry.length
         );
       },
       cone: (geometry = {}) => null,
       cylinder: (geometry = {}) => null,
       plane: (geometry = {}) => null,
       sphere: (geometry = {}) => {
-        return RAPIER.ColliderDesc.ball(geometry.radius || 1);
+        return RAPIER.ColliderDesc.ball(geometry.radius);
       },
-      trimesh: (geometry = {}) => null,
     }[geometry.type](geometry);
 
     if (!_shape) {
@@ -679,14 +679,15 @@ class Physics extends Base {
 
     const shape = this.getRapierShape(options.physics, options.geometry);
 
-    // console.log(`
-    //   geometry:  ${options.geometry.type}
-    //   material:  ${options.material.type}
-    //   physics:   ${options.physics.type}
-    //     - mass:  ${options.physics.mass}
-    // `);
-
-    return this.dynamicBodyAdd({ mesh, body, shape });
+    const r = this.dynamicBodyAdd({ mesh, body, shape });
+    console.log(`
+      uuid:      ${r.uuid}
+      geometry:  ${options.geometry.type}
+      material:  ${options.material.type}
+      physics:   ${options.physics.type}
+        - mass:  ${options.physics.mass}
+    `);
+    return r;
   }
 
   applyPhysicsBodyTrimesh(options = {}) {
@@ -698,43 +699,49 @@ class Physics extends Base {
       options
     );
 
-    const mesh = options.object;
-    const body = this.getRapierBody(options.physics);
+    options.object.traverse((mesh) => {
+      if (!mesh.isMesh) return;
 
-    const shape = (() => {
-      let vertices = [];
-      let indices = [];
+      const geometry = mesh.geometry.clone();
+      geometry.applyMatrix4(mesh.matrixWorld);
+      geometry.computeVertexNormals();
+      let vertices = geometry.attributes.position.array;
+      let indices = geometry.index.array;
 
-      mesh.traverse((child) => {
-        if (!child.isMesh) return;
+      const body = this.getRapierBody(
+        options.physics,
+        {
+          x: mesh.position.x,
+          y: mesh.position.y,
+          z: mesh.position.z,
+        },
+        {
+          x: mesh.quaternion.x,
+          y: mesh.quaternion.y,
+          z: mesh.quaternion.z,
+          w: mesh.quaternion.w,
+        }
+      );
 
-        const geometry = child.geometry.clone();
-        geometry.applyMatrix4(child.matrixWorld);
-        geometry.computeVertexNormals();
-        vertices = [...vertices, ...geometry.attributes.position.array];
-        indices = [...indices, ...geometry.index.array];
-      });
-
-      vertices = new Float32Array(vertices);
-      indices = new Uint32Array(indices);
-
-      return RAPIER.ColliderDesc.trimesh(
-        new Float32Array(vertices),
-        new Uint32Array(indices)
+      let shape = RAPIER.ColliderDesc.trimesh(
+        new Float32Array(new Float32Array(vertices)),
+        new Uint32Array(new Uint32Array(indices))
       ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-    })();
 
-    console.log(options, this);
-    this.dynamicBodyAdd({ mesh, body, shape });
+      this.dynamicBodyAdd({ mesh, body, shape });
+    });
   }
 
   dynamicBodyAdd({ mesh, body, shape }) {
+    const uuid = _.uuid();
     const collider = this.world.createCollider(shape, body);
-    this.dynamicBodies.push({ uuid: _.uuid(), collider, mesh, body, shape });
+    const item = { uuid, mesh, body, shape, collider };
+    this.dynamicBodies[uuid] = item;
+    return item;
   }
 
   dynamicBodyRemove(uuid) {
-    //
+    delete this.dynamicBodies[uuid];
   }
 
   characterController() {
