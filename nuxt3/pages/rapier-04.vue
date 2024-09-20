@@ -33,6 +33,7 @@ class LevelInstance extends Instance {
   onCreate() {
     const object = this.parent.preload.files.level.model.scene;
     this.parent.game.scene.add(object);
+    this.parent.physics.applyPhysicsBody({ object });
   }
 }
 
@@ -69,21 +70,25 @@ class TestInstance extends Instance {
     // const cube = new THREE.Mesh(geometry, material);
     // scene.add(cube);
 
-    this.parent.physics.dynamicBasicMeshAdd({
+    this.parent.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "box" },
       position: { x: -2, y: 0, z: 0 },
       physics: { type: "fixed" },
     });
 
-    this.parent.physics.dynamicBasicMeshAdd({
+    this.parent.physics.basicMeshAdd({
       material: { type: "basic" },
-      geometry: { type: "capsule", height: 0.5 },
+      geometry: {
+        type: "capsule",
+        radius: 0.5,
+        length: 0.5,
+      },
       position: { x: -4, y: 0, z: 0 },
       physics: { type: "fixed" },
     });
 
-    this.parent.physics.dynamicBasicMeshAdd({
+    this.parent.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "sphere", radius: 0.5 },
       position: { x: -6, y: 0, z: 0 },

@@ -439,7 +439,154 @@ class Physics extends Base {
     this.world.step();
   }
 
-  dynamicBasicMeshAdd(options = {}) {
+  getThreejsGeometry(options = {}) {
+    options = { type: "box", ...options };
+    return {
+      box: (options = {}) => {
+        return new THREE.BoxGeometry(
+          options.width || 1,
+          options.height || 1,
+          options.depth || 1
+        );
+      },
+      capsule: (options = {}) => {
+        return new THREE.CapsuleGeometry(
+          options.radius || 1,
+          options.length || 1,
+          options.capSegments || 4,
+          options.radialSegments || 8
+        );
+      },
+      cone: (options = {}) => {
+        return new THREE.ConeGeometry(
+          options.radius || 1,
+          options.height || 1,
+          options.radialSegments || 8,
+          options.heightSegments || 1,
+          options.openEnded || false,
+          options.thetaStart || 0,
+          options.thetaLength || Math.PI * 2
+        );
+      },
+      cylinder: (options = {}) => {
+        return new THREE.CylinderGeometry(
+          options.radiusTop || 1,
+          options.radiusBottom || 1,
+          options.height || 1,
+          options.radialSegments || 8,
+          options.heightSegments || 1,
+          options.openEnded || false,
+          options.thetaStart || 0,
+          options.thetaLength || Math.PI * 2
+        );
+      },
+      plane: (options = {}) => {
+        return new THREE.PlaneGeometry(
+          options.width || 1,
+          options.height || 1,
+          options.widthSegments || 32,
+          options.heightSegments || 16
+        );
+      },
+      sphere: (options = {}) => {
+        return new THREE.SphereGeometry(
+          options.radius,
+          options.widthSegments || 32,
+          options.heightSegments || 16,
+          options.phiStart || 0,
+          options.phiLength || Math.PI * 2,
+          options.thetaStart || 0,
+          options.thetaLength || Math.PI * 2
+        );
+      },
+    }[options.type](options);
+  }
+
+  getThreejsMaterial(options = {}) {
+    options = { type: "basic", ...options };
+
+    const opts = _.clone(options);
+    delete opts.type;
+
+    return {
+      basic: (options = {}) => new THREE.MeshBasicMaterial(options),
+      depth: (options = {}) => new THREE.MeshDepthMaterial(options),
+      lambert: (options = {}) => new THREE.MeshLambertMaterial(options),
+      matcap: (options = {}) => new THREE.MeshMatcapMaterial(options),
+      normal: (options = {}) => new THREE.MeshNormalMaterial(options),
+      phong: (options = {}) => new THREE.MeshPhongMaterial(options),
+      physical: (options = {}) => new THREE.MeshPhysicalMaterial(options),
+      standard: (options = {}) => new THREE.MeshStandardMaterial(options),
+      toon: (options = {}) => new THREE.MeshToonMaterial(options),
+    }[options.type](opts);
+  }
+
+  getThreejsMesh(geometry, material, position = {}, rotation = {}) {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(position.x || 0, position.y || 0, position.z || 0);
+    mesh.quaternion.set(
+      rotation.x || 0,
+      rotation.y || 0,
+      rotation.z || 0,
+      rotation.w || 0
+    );
+    return mesh;
+  }
+
+  getRapierBody(options = {}, position = {}, rotation = {}) {
+    options = { type: "dynamic", canSleep: false, ...options };
+
+    let rigidBodyDesc = {
+      dynamic: (options = {}) => {
+        return RAPIER.RigidBodyDesc.dynamic();
+      },
+      fixed: (options = {}) => {
+        return RAPIER.RigidBodyDesc.fixed();
+      },
+    }[options.type](options);
+
+    return this.world.createRigidBody(
+      rigidBodyDesc
+        .setTranslation(position.x || 0, position.y || 0, position.z || 0)
+        .setRotation({ x: 0, y: 0, z: 0, w: 0, ...rotation })
+        .setCanSleep(options.canSleep)
+    );
+  }
+
+  getRapierShape(options = {}, geometry = {}) {
+    options = { mass: 1, restitution: 1.1, ...options };
+    geometry = { type: "box", ...geometry };
+
+    let _shape = {
+      box: (geometry = {}) => {
+        return RAPIER.ColliderDesc.cuboid(
+          (geometry.width || 1) / 2,
+          (geometry.height || 1) / 2,
+          (geometry.depth || 1) / 2
+        );
+      },
+      capsule: (geometry = {}) => {
+        return RAPIER.ColliderDesc.capsule(
+          (geometry.radius || 1) / 4,
+          geometry.length || 1
+        );
+      },
+      cone: (geometry = {}) => null,
+      cylinder: (geometry = {}) => null,
+      plane: (geometry = {}) => null,
+      sphere: (geometry = {}) => {
+        return RAPIER.ColliderDesc.ball(geometry.radius || 1);
+      },
+    }[geometry.type](geometry);
+
+    if (!_shape) {
+      throw new Error(`Undefined shape "${geometry.type}"`);
+    }
+
+    return _shape.setMass(options.mass).setRestitution(options.restitution);
+  }
+
+  basicMeshAdd(options = {}) {
     // Configuration
     options = _.merge(
       {
@@ -471,167 +618,30 @@ class Physics extends Base {
         },
         physics: {
           type: "dynamic",
+          canSleep: false,
           mass: 1,
         },
       },
       options
     );
 
-    // Create geometry
-    const geometry = (() => {
-      let getOption = {
-        box: () =>
-          new THREE.BoxGeometry(
-            options.geometry.width,
-            options.geometry.height,
-            options.geometry.depth
-          ),
-        capsule: () =>
-          new THREE.CapsuleGeometry(
-            options.geometry.radius,
-            options.geometry.length,
-            options.geometry.capSegments,
-            options.geometry.radialSegments
-          ),
-        cone: () =>
-          new THREE.ConeGeometry(
-            options.geometry.radius,
-            options.geometry.height,
-            options.geometry.radialSegments,
-            options.geometry.heightSegments,
-            options.geometry.openEnded,
-            options.geometry.thetaStart,
-            options.geometry.thetaLength
-          ),
-        cylinder: () =>
-          new THREE.CylinderGeometry(
-            options.geometry.radiusTop,
-            options.geometry.radiusBottom,
-            options.geometry.height,
-            options.geometry.radialSegments,
-            options.geometry.heightSegments,
-            options.geometry.openEnded,
-            options.geometry.thetaStart,
-            options.geometry.thetaLength
-          ),
-        plane: () =>
-          new THREE.PlaneGeometry(
-            options.geometry.width,
-            options.geometry.height,
-            options.geometry.widthSegments,
-            options.geometry.heightSegments
-          ),
-        sphere: () =>
-          new THREE.SphereGeometry(
-            options.geometry.radius,
-            options.geometry.widthSegments,
-            options.geometry.heightSegments,
-            options.geometry.phiStart,
-            options.geometry.phiLength,
-            options.geometry.thetaStart,
-            options.geometry.thetaLength
-          ),
-      };
+    const geometry = this.getThreejsGeometry(options.geometry);
+    const material = this.getThreejsMaterial(options.material);
+    const mesh = this.getThreejsMesh(
+      geometry,
+      material,
+      options.position,
+      options.rotation
+    );
+    this.parent.game.scene.add(mesh);
 
-      if (typeof getOption[options.geometry.type] != "function") {
-        throw new Error(`Geometry "${options.geometry.type}" does not exists`);
-      }
+    const body = this.getRapierBody(
+      options.physics,
+      options.position,
+      options.rotation
+    );
 
-      return getOption[options.geometry.type]();
-    })();
-
-    // Create material
-    const material = (() => {
-      const optionsMaterial = _.clone(options.material);
-      delete optionsMaterial.type;
-
-      let getOption = {
-        basic: () => new THREE.MeshBasicMaterial(optionsMaterial),
-        depth: () => new THREE.MeshDepthMaterial(optionsMaterial),
-        lambert: () => new THREE.MeshLambertMaterial({ optionsMaterial }),
-        matcap: () => new THREE.MeshMatcapMaterial({ optionsMaterial }),
-        normal: () => new THREE.MeshNormalMaterial({ optionsMaterial }),
-        phong: () => new THREE.MeshPhongMaterial({ optionsMaterial }),
-        physical: () => new THREE.MeshPhysicalMaterial({ optionsMaterial }),
-        standard: () => new THREE.MeshStandardMaterial({ optionsMaterial }),
-        toon: () => new THREE.MeshToonMaterial({ optionsMaterial }),
-      };
-
-      if (typeof getOption[options.material.type] != "function") {
-        throw new Error(`Material "${options.material.type}" does not exists`);
-      }
-
-      return getOption[options.material.type]();
-    })();
-
-    // Create mesh
-    const mesh = ((geometry, material) => {
-      let _mesh = new THREE.Mesh(geometry, material);
-      _mesh.position.set(
-        options.position.x,
-        options.position.y,
-        options.position.z
-      );
-
-      this.parent.game.scene.add(_mesh);
-      return _mesh;
-    })(geometry, material);
-
-    // Create body
-    const body = (() => {
-      let getOption = {
-        dynamic: () => RAPIER.RigidBodyDesc.dynamic(),
-        fixed: () => RAPIER.RigidBodyDesc.fixed(),
-      };
-
-      if (typeof getOption[options.physics.type] != "function") {
-        throw new Error(`Physics "${options.physics.type}" does not exists`);
-      }
-
-      let rigidBodyDesc = getOption[options.physics.type]()
-        .setTranslation(
-          options.position.x,
-          options.position.y,
-          options.position.z
-        )
-        .setRotation(options.rotation)
-        .setCanSleep(false);
-
-      return this.world.createRigidBody(rigidBodyDesc);
-    })();
-
-    // Create shape
-    const shape = (() => {
-      let getOption = {
-        box: () =>
-          RAPIER.ColliderDesc.cuboid(
-            options.geometry.width / 2,
-            options.geometry.height / 2,
-            options.geometry.depth / 2
-          ),
-        capsule: () =>
-          RAPIER.ColliderDesc.capsule(
-            options.geometry.radius / 3,
-            options.geometry.length
-          ),
-        cone: () => null,
-        cylinder: () => null,
-        plane: () => null,
-        sphere: () => RAPIER.ColliderDesc.ball(options.geometry.radius),
-      };
-
-      if (typeof getOption[options.geometry.type] != "function") {
-        throw new Error(`Geometry "${options.geometry.type}" does not exists`);
-      }
-
-      const _shape = getOption[options.geometry.type]();
-
-      if (!_shape) {
-        throw new Error(`Undefined shape "${options.geometry.type}"`);
-      }
-
-      return _shape.setMass(options.physics.mass).setRestitution(1.1);
-    })();
+    const shape = this.getRapierShape(options.physics, options.geometry);
 
     console.log(`
       geometry:  ${options.geometry.type}
@@ -643,9 +653,21 @@ class Physics extends Base {
     return this.dynamicBodyAdd({ mesh, body, shape });
   }
 
+  applyPhysicsBody(options = {}) {
+    options = _.merge(
+      {
+        object: null,
+      },
+      options
+    );
+
+    console.log(options);
+  }
+
   dynamicBodyAdd({ mesh, body, shape }) {
+    const uid = _.uniqueId("physic-body-");
     const collider = this.world.createCollider(shape, body);
-    this.dynamicBodies.push({ collider, mesh, body, shape });
+    this.dynamicBodies.push({ uid, collider, mesh, body, shape });
   }
 
   characterController() {
