@@ -231,6 +231,9 @@ class Input extends Base {
     });
 
     if (ev.type == "keydown") {
+      if (ev.code == "Space") {
+        ev.preventDefault();
+      }
       this.keyboard[ev.key] = true;
       this.keyboard[ev.code] = true;
       this.keyboard[ev.keyCode] = true;
@@ -482,59 +485,59 @@ class Physics extends Base {
     return {
       box: (options = {}) => {
         return new THREE.BoxGeometry(
-          options.width || 1,
-          options.height || 1,
-          options.depth || 1
+          options.width,
+          options.height,
+          options.depth
         );
       },
       capsule: (options = {}) => {
         return new THREE.CapsuleGeometry(
-          options.radius || 1,
-          options.length || 1,
-          options.capSegments || 4,
-          options.radialSegments || 8
+          options.radius,
+          options.length,
+          options.capSegments,
+          options.radialSegments
         );
       },
       cone: (options = {}) => {
         return new THREE.ConeGeometry(
-          options.radius || 1,
-          options.height || 1,
-          options.radialSegments || 8,
-          options.heightSegments || 1,
-          options.openEnded || false,
-          options.thetaStart || 0,
-          options.thetaLength || Math.PI * 2
+          options.radius,
+          options.height,
+          options.radialSegments,
+          options.heightSegments,
+          options.openEnded,
+          options.thetaStart,
+          options.thetaLength
         );
       },
       cylinder: (options = {}) => {
         return new THREE.CylinderGeometry(
-          options.radiusTop || 1,
-          options.radiusBottom || 1,
-          options.height || 1,
-          options.radialSegments || 8,
-          options.heightSegments || 1,
-          options.openEnded || false,
-          options.thetaStart || 0,
-          options.thetaLength || Math.PI * 2
+          options.radiusTop,
+          options.radiusBottom,
+          options.height,
+          options.radialSegments,
+          options.heightSegments,
+          options.openEnded,
+          options.thetaStart,
+          options.thetaLength
         );
       },
       plane: (options = {}) => {
         return new THREE.PlaneGeometry(
-          options.width || 1,
-          options.height || 1,
-          options.widthSegments || 32,
-          options.heightSegments || 16
+          options.width,
+          options.height,
+          options.widthSegments,
+          options.heightSegments
         );
       },
       sphere: (options = {}) => {
         return new THREE.SphereGeometry(
           options.radius,
-          options.widthSegments || 32,
-          options.heightSegments || 16,
-          options.phiStart || 0,
-          options.phiLength || Math.PI * 2,
-          options.thetaStart || 0,
-          options.thetaLength || Math.PI * 2
+          options.widthSegments,
+          options.heightSegments,
+          options.phiStart,
+          options.phiLength,
+          options.thetaStart,
+          options.thetaLength
         );
       },
     }[options.type](options);
@@ -591,13 +594,18 @@ class Physics extends Base {
   }
 
   getRapierPhysicsOptions(options = {}) {
-    return {
-      type: "dynamic",
-      canSleep: false,
-      restitution: 1.1,
-      mass: 1,
-      ...options,
-    };
+    return _.merge(
+      {
+        type: "dynamic",
+        canSleep: false,
+        restitution: 1.1,
+        mass: 1,
+        friction: 0.5,
+        linvel: { x: 0, y: 0, z: 0 },
+        angvel: { x: 0, y: 0, z: 0 },
+      },
+      options
+    );
   }
 
   getRapierBody(options = {}, position = {}, rotation = {}) {
@@ -610,6 +618,12 @@ class Physics extends Base {
       fixed: (options = {}) => {
         return RAPIER.RigidBodyDesc.fixed();
       },
+      kinematicVelocityBased: (options = {}) => {
+        return RAPIER.RigidBodyDesc.kinematicVelocityBased();
+      },
+      kinematicPositionBased: (options = {}) => {
+        return RAPIER.RigidBodyDesc.kinematicPositionBased();
+      },
     }[options.type](options);
 
     return this.world.createRigidBody(
@@ -617,6 +631,8 @@ class Physics extends Base {
         .setTranslation(position.x || 0, position.y || 0, position.z || 0)
         .setRotation({ x: 0, y: 0, z: 0, w: 0, ...rotation })
         .setCanSleep(options.canSleep)
+        .setLinvel(options.linvel.x, options.linvel.y, options.linvel.z)
+        .setAngvel(options.angvel)
     );
   }
 
@@ -634,8 +650,8 @@ class Physics extends Base {
       },
       capsule: (geometry = {}) => {
         return RAPIER.ColliderDesc.capsule(
-          geometry.radius - 0.3,
-          geometry.length
+          geometry.length / 2,
+          geometry.radius
         );
       },
       cone: (geometry = {}) => null,
@@ -650,7 +666,10 @@ class Physics extends Base {
       throw new Error(`Undefined shape "${geometry.type}"`);
     }
 
-    return _shape.setMass(options.mass).setRestitution(options.restitution);
+    return _shape
+      .setMass(options.mass)
+      .setRestitution(options.restitution)
+      .setFriction(options.friction);
   }
 
   basicMeshAdd(options = {}) {
@@ -695,12 +714,14 @@ class Physics extends Base {
       {
         object: null,
         physics: this.getRapierPhysicsOptions(),
+        filter: (mesh) => true,
       },
       options
     );
 
     options.object.traverse((mesh) => {
       if (!mesh.isMesh) return;
+      if (!options.filter(mesh)) return;
 
       const geometry = mesh.geometry.clone();
       geometry.applyMatrix4(mesh.matrixWorld);
@@ -744,6 +765,8 @@ class Physics extends Base {
     delete this.dynamicBodies[uuid];
   }
 
+  // https://sketches.isaacmason.com/sketch/recast-navigation/rigid-body-agent
+  // https://github.com/isaac-mason/sketches/blob/main/sketches/recast-navigation/rigid-body-agent/src/player.tsx#L145
   characterController() {
     return new (class {
       parent = null;
