@@ -601,6 +601,7 @@ class Physics extends Base {
         restitution: 1.1,
         mass: 1,
         friction: 0.5,
+        sensor: false,
         linvel: { x: 0, y: 0, z: 0 },
         angvel: { x: 0, y: 0, z: 0 },
       },
@@ -669,7 +670,8 @@ class Physics extends Base {
     return _shape
       .setMass(options.mass)
       .setRestitution(options.restitution)
-      .setFriction(options.friction);
+      .setFriction(options.friction)
+      .setSensor(options.sensor);
   }
 
   basicMeshAdd(options = {}) {

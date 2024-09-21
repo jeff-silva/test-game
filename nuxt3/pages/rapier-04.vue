@@ -48,85 +48,152 @@ class LevelInstance extends Instance {
 class PlayerInstance extends Instance {
   onCreate() {
     this.parent.game.camera.position.set(-4, 0, 4);
-    // this.pointerLock = this.parent.game.getPointerLockControls({
-    //   target: this.parent.game.camera,
-    // });
+
+    this.player = this.parent.physics.basicMeshAdd({
+      material: { type: "basic", color: 0xff0000 },
+      geometry: { type: "capsule", radius: 0.2, length: 0.5 },
+      position: { x: -2, y: 0.5, z: 1 },
+      physics: {
+        type: "kinematicPositionBased",
+        mass: 1,
+        friction: 0,
+        restitution: 0,
+        linvel: { x: 1 },
+      },
+    });
+
+    // this.initPointerLockControls();
     this.initCharacterController();
+    // this.initMovement();
   }
 
-  onUpdate() {
-    const moveSpeed = 0.05;
-    this.parent.game.camera.lookAt(this.player.mesh.position);
+  initPointerLockControls() {
+    this.pointerLock = this.parent.game.getPointerLockControls({
+      target: this.parent.game.camera,
+    });
 
-    if (this.parent.input.keyboard.w) {
-      this.player.body.setLinvel({ x: 0, y: 0, z: 1 }, true);
-    }
-    if (this.parent.input.keyboard.s) {
-      this.player.body.setLinvel({ x: 0, y: 0, z: -1 }, true);
-    }
-    if (this.parent.input.keyboard.a) {
-      this.player.body.setAngvel({ x: 0, y: -1, z: 0 }, true);
-    }
-    if (this.parent.input.keyboard.d) {
-      this.player.body.setAngvel({ x: 0, y: 1, z: 0 }, true);
-    }
+    this.parent.event.on("update", () => {
+      const moveSpeed = 0.05;
 
-    // if (this.parent.input.keyboard.w) {
-    //   this.pointerLock.moveForward(moveSpeed);
-    // }
-    // if (this.parent.input.keyboard.s) {
-    //   this.pointerLock.moveForward(-moveSpeed);
-    // }
-    // if (this.parent.input.keyboard.a) {
-    //   this.pointerLock.moveRight(-moveSpeed);
-    // }
-    // if (this.parent.input.keyboard.d) {
-    //   this.pointerLock.moveRight(moveSpeed);
-    // }
+      if (this.parent.input.keyboard.w) {
+        this.pointerLock.moveForward(moveSpeed);
+      }
+      if (this.parent.input.keyboard.s) {
+        this.pointerLock.moveForward(-moveSpeed);
+      }
+      if (this.parent.input.keyboard.a) {
+        this.pointerLock.moveRight(-moveSpeed);
+      }
+      if (this.parent.input.keyboard.d) {
+        this.pointerLock.moveRight(moveSpeed);
+      }
+    });
   }
 
   initCharacterController() {
     const { RAPIER, THREE } = this.parent.game;
     const { world } = this.parent.physics;
 
-    let player = (this.player = this.parent.physics.basicMeshAdd({
-      material: { type: "basic", color: 0xff0000 },
-      geometry: { type: "capsule", radius: 0.2, length: 0.5 },
-      position: { x: -2, y: 0.5, z: 1 },
-      physics: { type: "dynamic", mass: 0.01, friction: 0, linvel: { x: 1 } },
-    }));
+    this.characterController = world.createCharacterController(0.01);
+    this.characterController.setSlideEnabled(true);
+    this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
+    this.characterController.setMinSlopeSlideAngle((30 * Math.PI) / 180);
+    this.characterController.enableAutostep(0.5, 0.2, true);
+    this.characterController.enableSnapToGround(0.5);
+    this.characterController.setApplyImpulsesToDynamicBodies(true);
+    this.characterController.setCharacterMass(1);
 
-    let characterController = world.createCharacterController(0.01); // Spacing
-    characterController.setSlideEnabled(true); // Allow sliding down hill
-    characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180); // Don’t allow climbing slopes larger than 45 degrees.
-    characterController.setMinSlopeSlideAngle((30 * Math.PI) / 180); // Automatically slide down on slopes smaller than 30 degrees.
-    characterController.enableAutostep(0.5, 0.2, true); // (maxHeight, minWidth, includeDynamicBodies) Stair behavior
-    characterController.enableSnapToGround(0.5); // (distance) Set ground snap behavior
-    characterController.setApplyImpulsesToDynamicBodies(true); // Add push behavior
-    characterController.setCharacterMass(1);
+    let movementDirection = { x: 0, y: -0.01, z: 0 };
+    let speed = 0.05;
 
-    let position = new THREE.Vector3(0, 0, 0);
+    this.parent.event.on("update", () => {
+      this.parent.game.camera.lookAt(this.player.mesh.position);
 
-    // console.log(this.parent.physics.dynamicBodies);
-    // console.log(player.collider);
+      // const charPos = new THREE.Vector3(this.player.body.translation());
+      // const camPos = this.parent.game.camera.position.clone();
+      // const lerp = charPos.lerp(camPos, 0.02);
+      // console.log({ charPos, camPos, lerp });
 
-    // player.body.setAngvel({ x: 3.0, y: 0, z: 0 });
+      movementDirection.x = 0;
+      movementDirection.z = 0;
 
-    // this.parent.event.on("update", () => {
-    //   // position.x += 0.01;
-    //   // characterController.computeColliderMovement(
-    //   //   player.collider,
-    //   //   position,
-    //   //   RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
-    //   // );
-    //   // const movement = characterController.computedMovement();
-    //   // const newPos = player.body.translation();
-    //   // newPos.x -= 0.01;
-    //   // newPos.z -= 0.005;
-    //   // player.body.setNextKinematicTranslation(newPos);
-    //   // player.body.setLinvel(1, 0, 0);
-    //   // console.log(player.body.translation());
-    // });
+      if (this.parent.input.keyboard.w) {
+        movementDirection.z = speed;
+      }
+      if (this.parent.input.keyboard.s) {
+        movementDirection.z = -speed;
+      }
+      if (this.parent.input.keyboard.a) {
+        movementDirection.x = -speed;
+      }
+      if (this.parent.input.keyboard.d) {
+        movementDirection.x = speed;
+      }
+
+      // const grounded = this.characterController.computedGrounded();
+      // console.log({ grounded });
+
+      this.characterController.computeColliderMovement(
+        this.player.collider,
+        movementDirection
+      );
+
+      const translation = this.player.body.nextTranslation();
+      const corrected = this.characterController.computedMovement();
+
+      this.player.body.setNextKinematicTranslation({
+        x: translation.x + corrected.x,
+        y: translation.y + corrected.y,
+        z: translation.z + corrected.z,
+      });
+
+      // const colls = this.characterController.numComputedCollisions();
+      // console.log(colls);
+      // for (let i = 0; i < colls; i++) {
+      //   if (!this.characterController.computedCollision(i, this.player.shape))
+      //     continue;
+      //   console.log(i);
+      // }
+
+      // this.characterController.computeColliderMovement(
+      //   this.player.collider,
+      //   velocity
+      // );
+
+      // const correctedMovement = this.characterController.computedMovement();
+      // const translation = this.player.body.translation();
+      // // translation.y -= 0.01;
+      // this.player.body.setNextKinematicTranslation({
+      //   x: translation.x + correctedMovement.x,
+      //   y: translation.y + correctedMovement.y,
+      //   z: translation.z + correctedMovement.z,
+      // });
+    });
+  }
+
+  initMovement() {
+    this.parent.event.on("update", () => {
+      this.parent.game.camera.lookAt(this.player.mesh.position);
+
+      if (this.parent.input.keyboard.w) {
+        this.player.body.setLinvel({ x: null, y: null, z: 2 }, true);
+      }
+      if (this.parent.input.keyboard.s) {
+        this.player.body.setLinvel({ x: null, y: null, z: -2 }, true);
+      }
+      if (this.parent.input.keyboard.a) {
+        const rot = this.player.body.rotation();
+        rot.w += 1;
+        this.player.body.setRotation(rot);
+        console.log(this.player.body.rotation());
+      }
+      if (this.parent.input.keyboard.d) {
+        this.player.body.setAngvel({ x: null, y: 10, z: null }, true);
+      }
+      if (this.parent.input.keyboard.Space) {
+        this.player.body.setLinvel({ x: null, y: 5, z: null }, true);
+      }
+    });
   }
 }
 
