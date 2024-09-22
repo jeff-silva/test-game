@@ -104,15 +104,21 @@ class PlayerInstance extends Instance {
     this.characterController.setCharacterMass(1);
 
     let movementDirection = { x: 0, y: -0.01, z: 0 };
+    let charRotation = { w: 0, x: 0, y: 0, z: 0 };
     let speed = 0.05;
 
-    this.parent.event.on("update", () => {
-      this.parent.game.camera.lookAt(this.player.mesh.position);
+    this.player.mesh.attach(this.parent.game.camera);
+    this.parent.game.camera.position.set(0, 1, 2);
+    this.parent.game.camera.rotation.set(-0.3, 0, 0);
 
+    this.parent.event.on("update", () => {
+      // this.parent.game.camera.lookAt(this.player.mesh.position);
+
+      // let charPos = this.player.body.translation();
       // const charPos = new THREE.Vector3(this.player.body.translation());
-      // const camPos = this.parent.game.camera.position.clone();
-      // const lerp = charPos.lerp(camPos, 0.02);
-      // console.log({ charPos, camPos, lerp });
+      // const charPos = new THREE.Vector3(0, 0, 4);
+      // this.parent.game.camera.position.lerp(charPos, 0.01);
+      // console.log({ charPos });
 
       movementDirection.x = 0;
       movementDirection.z = 0;
@@ -127,8 +133,13 @@ class PlayerInstance extends Instance {
         movementDirection.x = -speed;
       }
       if (this.parent.input.keyboard.d) {
-        movementDirection.x = speed;
+        // movementDirection.x = speed;
+        charRotation.y += 0.01;
+        // this.player.body.setRotation(charRotation);
+        this.player.body.setNextKinematicRotation(charRotation);
       }
+
+      console.log(JSON.stringify(charRotation));
 
       // const grounded = this.characterController.computedGrounded();
       // console.log({ grounded });
