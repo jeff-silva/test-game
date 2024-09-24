@@ -1152,29 +1152,64 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
   basicWasdMovimentationUpdate() {
     const { Vec3, Quat } = this.root.game.helpers;
     // const delta = this.root.game.clock.getDelta();
-    let playerPos = Vec3(this.player.body.translation());
-
-    // // playerPos.y -= 0.1;
-    // // playerPos.x = 0;
-    // // playerPos.z = 0;
+    let charDirection = Vec3();
+    let charMoveFront = Vec3();
+    let charMoveRight = Vec3();
 
     this.playerSpeed = 0;
 
     if (this.root.input.keyboard("w")) {
-      this.playerSpeed = this.options.playerSpeed;
+      // this.playerSpeed = this.options.playerSpeed;
+      charMoveFront.z = 1;
     }
 
     if (this.root.input.keyboard("s")) {
-      this.playerSpeed = -this.options.playerSpeed;
+      // this.playerSpeed = -this.options.playerSpeed;
+      charMoveFront.z = -1;
     }
 
     if (this.root.input.keyboard("a")) {
-      this.playerRot.y += 0.03;
+      // this.playerRot.y += 0.03;
+      charMoveFront.x = 1;
     }
 
     if (this.root.input.keyboard("d")) {
-      this.playerRot.y -= 0.03;
+      // this.playerRot.y -= 0.03;
+      charMoveFront.x = -1;
     }
+
+    charDirection
+      .subVectors(charMoveFront, charMoveRight)
+      .normalize()
+      .multiplyScalar(this.options.playerSpeed * -1);
+
+    const cameraWorldDirection = this.root.game.camera.getWorldDirection(
+      new THREE.Vector3()
+    );
+    const cameraYaw = Math.atan2(
+      cameraWorldDirection.x,
+      cameraWorldDirection.z
+    );
+    charDirection
+      .applyAxisAngle(Vec3({ x: 0, y: 1, z: 0 }), cameraYaw)
+      .multiplyScalar(-1);
+
+    const charMoveDirection = {
+      x: charDirection.x,
+      y: 0,
+      z: charDirection.z,
+    };
+
+    this.characterController.computeColliderMovement(
+      this.player.collider,
+      charMoveDirection
+    );
+
+    this.player.body.setNextKinematicTranslation(
+      Vec3()
+        .copy(this.player.body.translation())
+        .add(this.characterController.computedMovement())
+    );
 
     // let pos = Vec3(this.player.body.translation()).add(
     //   Vec3({ x: 0, y: 0, z: 1 })
@@ -1182,19 +1217,22 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
     //     .multiplyScalar(this.playerSpeed * -1)
     // );
 
+    // const pos = Vec3({ x: 0, y: 0, z: 1 })
+    //   .applyQuaternion(Quat(this.player.body.rotation()))
+    //   .multiplyScalar(0.5);
+
     // this.characterController.computeColliderMovement(this.player.collider, pos);
     // const translation = this.player.body.nextTranslation();
     // const corrected = this.characterController.computedMovement();
 
     // this.player.body.setNextKinematicTranslation({
-    //   x: pos.x + corrected.x,
-    //   y: pos.y + corrected.y,
-    //   z: pos.z + corrected.z,
+    //   x: translation.x + corrected.x,
+    //   y: translation.y + corrected.y,
+    //   z: translation.z + corrected.z,
     // });
 
     // this.player.body.setNextKinematicTranslation(corrected);
 
-    console.log(this.playerRot.y);
     this.player.body.setNextKinematicRotation(
       Quat().setFromEuler(new THREE.Euler(0, this.playerRot.y, 0))
     );
