@@ -55,7 +55,6 @@ export const Scene = class Scene {
     setTimeout(async () => {
       await RAPIER.init();
       await this.preload.init(this.preloadFiles());
-      console.log(this);
       this.create();
       this.update();
     }, 10);
@@ -344,8 +343,18 @@ class Input extends Base {
   }
 
   onCreate() {
-    this.getEvents().map((args) => {
-      document.addEventListener(...args);
+    this.getEvents().map(([evt, call]) => {
+      document.addEventListener(evt, (ev) => {
+        if (
+          !(
+            document.activeElement == this.parent.canvas.el ||
+            this.parent.canvas.el.contains(document.activeElement)
+          )
+        )
+          return;
+        ev.preventDefault();
+        this.eventHandler(ev, evt);
+      });
     });
 
     setInterval(() => {
@@ -367,14 +376,6 @@ class Input extends Base {
   }
 
   eventHandler(ev, evt) {
-    if (
-      !(
-        document.activeElement == this.parent.canvas.el ||
-        this.parent.canvas.el.contains(document.activeElement)
-      )
-    )
-      return;
-
     if (ev.key) this.keyboardEvs[ev.key] = ev;
     if (ev.code) this.keyboardEvs[ev.code] = ev;
     if (ev.keyCode) this.keyboardEvs[ev.keyCode] = ev;
@@ -1044,8 +1045,11 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
         inputBackward: ["s"],
         inputLeft: ["a"],
         inputRight: ["d"],
+        inputJump: ["Space"],
+        mouseSensitivity: 0.5,
         cameraMode: "First", // first, third
         playerSpeed: 0.06,
+        playerJumpForce: 0.2,
         playerMaterial: { type: "basic", color: 0xff0000 },
         playerGeometry: { type: "capsule", radius: 0.2, length: 0.5 },
         playerPosition: { x: 0, y: 0, z: 0 },
@@ -1081,22 +1085,11 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
   cameraInit() {
     const { world } = this.root.physics;
     const { Vec3, Quat } = this.root.game.helpers;
-    console.log(`cameraInit: ${this.options.cameraMode}`);
 
     // Restart and clear instance data
     // this.root.game.camera.removeFromParent();
 
     if (!this.player) {
-      this.player = this.root.physics.basicMeshAdd({
-        material: this.options.playerMaterial,
-        geometry: this.options.playerGeometry,
-        position: this.options.playerPosition,
-        physics: this.options.playerPhysics,
-      });
-
-      this.playerSpeed = 0;
-      this.playerRot = Quat(this.player.body.rotation()).toJson();
-
       this.characterController = world.createCharacterController(0.01);
       this.characterController.setSlideEnabled(true);
       this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
@@ -1106,15 +1099,34 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
       this.characterController.setApplyImpulsesToDynamicBodies(true);
       this.characterController.setCharacterMass(1);
 
+      this.player = this.root.physics.basicMeshAdd({
+        material: this.options.playerMaterial,
+        geometry: this.options.playerGeometry,
+        position: this.options.playerPosition,
+        physics: this.options.playerPhysics,
+      });
+
+      this.playerSpeed = 0;
+      this.playerRot = Quat(this.player.body.rotation()).toJson();
+      this.playerGrounded = false;
+      this.playerJumpForce = 0;
+      this.playerGravity = 0;
+
       this.mouseMovement = { x: 0, y: 0 };
 
       this.pointerLockControl = new (class {
         constructor(parent) {
           this.parent = parent;
           this.root = parent.root;
+          let t;
           this.root.canvas.el.addEventListener("pointermove", (ev) => {
             if (!this.locked()) return;
             this.pointerMoveHandler(ev);
+            if (t) clearTimeout(t);
+            t = setTimeout(() => {
+              this.parent.mouseMovement.x = 0;
+              this.parent.mouseMovement.y = 0;
+            }, 10);
           });
         }
 
@@ -1127,8 +1139,11 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
         }
 
         pointerMoveHandler(ev) {
-          this.parent.mouseMovement.x = ev.movementX;
-          this.parent.mouseMovement.y = ev.movementY;
+          const minOffset = 0.002;
+          this.parent.mouseMovement.x =
+            ev.movementX * minOffset * this.parent.options.mouseSensitivity;
+          this.parent.mouseMovement.y =
+            ev.movementY * minOffset * this.parent.options.mouseSensitivity;
         }
       })(this);
     }
@@ -1147,6 +1162,14 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
     });
 
     this.root.event.on("update", () => {
+      this.playerGrounded = this.characterController.computedGrounded();
+      if (this.playerGrounded) {
+        // this.playerJumpForce = Math.max(-0.02, this.playerJumpForce - 0.006);
+        this.playerGravity = 0;
+      } else {
+        this.playerGravity = Math.max(-9.2, this.playerGravity - 0.005);
+      }
+
       if (typeof this[methodCameraUpdate] == "function") {
         this[methodCameraUpdate]();
       }
@@ -1160,7 +1183,7 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
   cameraFirstUpdate() {
     const { Vec3, Quat } = this.root.game.helpers;
     // this.root.game.camera.position.lerp(Vec3({ x: 0, y: 0, z: 0 }), 0.1);
-    this.root.game.camera.position.set(0, 0, 0);
+    this.root.game.camera.position.set(0, 1, 0);
     this.root.game.camera.rotation.set(0, 0, 0);
     this.basicWasdMovimentationUpdate();
   }
@@ -1206,7 +1229,13 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
       charMoveFront.x = -1;
     }
 
-    // this.playerRot.y += this.mouseMovement.y / 10;
+    if (this.root.input.keyboard("Space")) {
+      if (this.playerGrounded) {
+        this.playerGravity += this.options.playerJumpForce;
+      }
+    }
+
+    this.playerRot.y += this.mouseMovement.x * -1;
 
     charDirection
       .subVectors(charMoveFront, charMoveRight)
@@ -1226,7 +1255,7 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
 
     const charMoveDirection = {
       x: charDirection.x,
-      y: 0,
+      y: this.playerGravity,
       z: charDirection.z,
     };
 
