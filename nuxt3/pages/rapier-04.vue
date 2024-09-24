@@ -32,17 +32,18 @@ class GameScene extends Scene {
   }
 
   onCreate() {
-    this.instanceAdd(new LevelInstance());
-    this.instanceAdd(new PlayerInstance());
-    this.instanceAdd(new TestInstance());
+    this.game.camera.position.set(-4, 1, 6);
+    this.instanceAdd(new LevelInstance(this));
+    this.instanceAdd(new PlayerInstance(this));
+    this.instanceAdd(new TestInstance(this));
   }
 }
 
 class LevelInstance extends Instance {
   onCreate() {
-    const object = this.parent.preload.files.level.model.scene;
-    this.parent.game.scene.add(object);
-    this.parent.physics.applyPhysicsBodyTrimesh({
+    const object = this.root.preload.files.level.model.scene;
+    this.root.game.scene.add(object);
+    this.root.physics.applyPhysicsBodyTrimesh({
       object,
       physics: { type: "fixed", mass: 100 },
       filter: (mesh) => {
@@ -57,7 +58,7 @@ class PlayerInstance extends Instance {
   onCreate() {
     this.player = this.scriptAdd(
       new CharacterCameraScript(this, {
-        camera: this.parent.game.camera,
+        camera: this.root.game.camera,
         playerPosition: { x: -2, y: 0.5, z: 1 },
       })
     );
@@ -68,6 +69,7 @@ class PlayerInstance extends Instance {
 
 class PlayerInstanceOld extends Instance {
   onCreate() {
+    return;
     this.parent.game.camera.position.set(-4, 0, 4);
 
     this.player = this.parent.physics.basicMeshAdd({
@@ -238,9 +240,9 @@ class PlayerInstanceOld extends Instance {
 
 class TestInstance extends Instance {
   onCreate() {
-    const { THREE, scene } = this.parent.game;
+    const { THREE, scene } = this.root.game;
 
-    this.parent.physics.basicMeshAdd({
+    this.root.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "box" },
       position: { x: -2, y: 0.5, z: 0 },
@@ -248,7 +250,7 @@ class TestInstance extends Instance {
       physics: { type: "dynamic", mass: 0.01 },
     });
 
-    this.parent.physics.basicMeshAdd({
+    this.root.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: {
         type: "capsule",
@@ -260,7 +262,7 @@ class TestInstance extends Instance {
       physics: { type: "dynamic" },
     });
 
-    this.parent.physics.basicMeshAdd({
+    this.root.physics.basicMeshAdd({
       material: { type: "basic" },
       geometry: { type: "sphere", radius: 0.5 },
       position: { x: -6, y: 0.5, z: 0 },

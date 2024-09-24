@@ -113,20 +113,26 @@ export const Scene = class Scene {
   }
 
   instanceAdd(instance) {
-    instance.parent = this;
     this.instances.push(instance);
+    return instance;
   }
 };
 
 export const Instance = class Instance {
+  root = null;
   parent = null;
+
+  constructor(parent) {
+    this.root = parent;
+    this.parent = parent;
+  }
+
   onCreate() {}
   onUpdate() {}
   onDestroy() {}
 
   scripts = [];
   scriptAdd(scriptInstance) {
-    scriptInstance.parent = this;
     this.scripts.push(scriptInstance);
     return scriptInstance;
   }
@@ -217,18 +223,141 @@ class Event extends Base {
   }
 }
 
+// class Input extends Base {
+//   keyboardEvs = {};
+//   mouse = {
+//     click: { x: 0, y: 0 },
+//     movement: { x: 0, y: 0 },
+//     offset: { x: 0, y: 0 },
+//   };
+
+//   onCreate() {
+//     this.getEvents().map((args) => {
+//       document.addEventListener(...args);
+//     });
+//   }
+
+//   onDestroy() {
+//     this.getEvents().map((args) => {
+//       document.removeEventListener(...args);
+//     });
+//   }
+
+//   eventHandler(ev, evt) {
+//     const eventKeys = [`input`, `input.${evt.type}`, `input.${ev.type}`];
+
+//     eventKeys.map((eventKey) => {
+//       this.parent.event.dispatch(eventKey, ev);
+//     });
+
+//     if (ev.type == "keydown") {
+//       if (ev.code == "Space") {
+//         ev.preventDefault();
+//       }
+//     }
+//     this.keyboardEvs[ev.key] = ev;
+//     this.keyboardEvs[ev.code] = ev;
+//     this.keyboardEvs[ev.keyCode] = ev;
+
+//     if (ev.type == "keyup") {
+//       setTimeout(() => {
+//         [ev.key, ev.code, ev.keyCode, "undefined"].map((evk) => {
+//           if (typeof this.keyboardEvs[evk] == "undefined") return;
+//           delete this.keyboardEvs[evk];
+//         });
+//         console.log(this.keyboardEvs, ev);
+//       }, 2);
+//       console.log(this.keyboardEvs);
+//     }
+
+//     if (ev.type == "click") {
+//       this.mouse.click.x = ev.offsetX;
+//       this.mouse.click.y = ev.offsetY;
+//     }
+//     if (["mousemove", "pointermove"].includes(ev.type)) {
+//       for (let attr in this.mouse) {
+//         if (typeof ev[`${attr}X`] == "undefined") continue;
+//         this.mouse[attr]["x"] = ev[`${attr}X`];
+//         this.mouse[attr]["y"] = ev[`${attr}Y`];
+//       }
+//     }
+//   }
+
+//   keyboard(key, type = "keydown") {
+//     return this.keyboardEvs[key] && this.keyboardEvs[key]["type"] == type;
+//   }
+
+//   getEvents() {
+//     let events = [
+//       { type: "mouse", name: "click" },
+//       { type: "mouse", name: "mouseenter" },
+//       { type: "mouse", name: "mouseleave" },
+//       { type: "mouse", name: "mousemove" },
+//       { type: "mouse", name: "pointermove" },
+//       { type: "mouse", name: "pointerdown" },
+//       { type: "mouse", name: "pointerout" },
+//       { type: "mouse", name: "pointerlockchange" },
+//       { type: "keyboard", name: "keyup" },
+//       { type: "keyboard", name: "keydown" },
+//     ];
+
+//     let ret = [];
+//     events.map((evt) => {
+//       ret.push([evt.name, (ev) => this.eventHandler(ev, evt)]);
+//     });
+
+//     return ret;
+//   }
+// }
+
 class Input extends Base {
-  keyboard = {};
-  mouse = {
-    click: { x: 0, y: 0 },
-    movement: { x: 0, y: 0 },
-    offset: { x: 0, y: 0 },
-  };
+  events = [];
+  keyboardEvs = {};
+
+  keyboard(...args) {
+    if (args.length == 1) {
+      let keys = Array.isArray(args[0]) ? args[0] : [args[0]];
+      for (let k in keys) {
+        if (typeof this.keyboardEvs[keys[k]] != "undefined") {
+          return this.keyboardEvs[keys[k]];
+        }
+      }
+
+      return false;
+    }
+
+    if (args.length == 2) {
+      let [keys, call] = args;
+      (Array.isArray(keys) ? keys : [keys]).map((key) => {
+        this.events.push({ key, type: null, call });
+      });
+    }
+
+    if (args.length == 3) {
+      let [keys, types, call] = args;
+      (Array.isArray(keys) ? keys : [keys]).map((key) => {
+        (Array.isArray(types) ? types : [types]).map((type) => {
+          this.events.push({ key, type, call });
+        });
+      });
+    }
+  }
 
   onCreate() {
     this.getEvents().map((args) => {
       document.addEventListener(...args);
     });
+
+    setInterval(() => {
+      for (let k in this.keyboardEvs) {
+        const ev = this.keyboardEvs[k];
+        const evs = this.events.filter((e) => e.type == null);
+        if (evs[0]) {
+          evs[0]["call"](ev);
+          break;
+        }
+      }
+    }, 1);
   }
 
   onDestroy() {
@@ -238,35 +367,33 @@ class Input extends Base {
   }
 
   eventHandler(ev, evt) {
-    const eventKeys = [`input`, `input.${evt.type}`, `input.${ev.type}`];
+    if (
+      !(
+        document.activeElement == this.parent.canvas.el ||
+        this.parent.canvas.el.contains(document.activeElement)
+      )
+    )
+      return;
 
-    eventKeys.map((eventKey) => {
-      this.parent.event.dispatch(eventKey, ev);
-    });
+    if (ev.key) this.keyboardEvs[ev.key] = ev;
+    if (ev.code) this.keyboardEvs[ev.code] = ev;
+    if (ev.keyCode) this.keyboardEvs[ev.keyCode] = ev;
 
-    if (ev.type == "keydown") {
-      if (ev.code == "Space") {
-        ev.preventDefault();
-      }
-      this.keyboard[ev.key] = true;
-      this.keyboard[ev.code] = true;
-      this.keyboard[ev.keyCode] = true;
-    }
     if (ev.type == "keyup") {
-      delete this.keyboard[ev.key];
-      delete this.keyboard[ev.code];
-      delete this.keyboard[ev.keyCode];
+      [ev.key, ev.code, ev.keyCode].map((evk) => {
+        if (typeof this.keyboardEvs[evk] == "undefined") return;
+        delete this.keyboardEvs[evk];
+      });
     }
-    if (ev.type == "click") {
-      this.mouse.click.x = ev.offsetX;
-      this.mouse.click.y = ev.offsetY;
-    }
-    if (["mousemove", "pointermove"].includes(ev.type)) {
-      for (let attr in this.mouse) {
-        if (typeof ev[`${attr}X`] == "undefined") continue;
-        this.mouse[attr]["x"] = ev[`${attr}X`];
-        this.mouse[attr]["y"] = ev[`${attr}Y`];
-      }
+
+    const evs = this.events.filter(
+      (e) =>
+        e.type == ev.type &&
+        (e.key == ev.key || e.key == ev.code || e.key == ev.keyCode)
+    );
+
+    if (evs[0]) {
+      evs[0]["call"](ev);
     }
   }
 
@@ -301,6 +428,7 @@ class Canvas extends Base {
   onCreate() {
     const { options } = this.parent;
     this.el = document.querySelector(options.el);
+    this.el.setAttribute("tabindex", "0");
     this.resizeHandler();
 
     window.addEventListener("resize", () => {
@@ -896,6 +1024,7 @@ class Debug {
 export const CharacterCameraScript = class CharacterCameraScript extends Script {
   root = null;
   parent = null;
+  cameraModes = ["First", "Third"];
   options = {};
   player = null;
   characterController = null;
@@ -942,32 +1071,41 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
   }
 
   cameraModeSet(mode) {
+    if (!this.cameraModes.includes(mode))
+      throw new Error(`Camera mode "${mode}" does not exists`);
+    if (this.options.cameraMode == mode) return;
     this.options.cameraMode = mode;
     this.cameraInit();
   }
 
   cameraInit() {
-    const { RAPIER, THREE, clock } = this.root.game;
     const { world } = this.root.physics;
+    const { Vec3, Quat } = this.root.game.helpers;
+    console.log(`cameraInit: ${this.options.cameraMode}`);
 
     // Restart and clear instance data
-    this.root.game.camera.parent = null;
+    // this.root.game.camera.removeFromParent();
 
-    this.player = this.root.physics.basicMeshAdd({
-      material: this.options.playerMaterial,
-      geometry: this.options.playerGeometry,
-      position: this.options.playerPosition,
-      physics: this.options.playerPhysics,
-    });
+    if (!this.player) {
+      this.player = this.root.physics.basicMeshAdd({
+        material: this.options.playerMaterial,
+        geometry: this.options.playerGeometry,
+        position: this.options.playerPosition,
+        physics: this.options.playerPhysics,
+      });
 
-    this.characterController = world.createCharacterController(0.01);
-    this.characterController.setSlideEnabled(true);
-    this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
-    this.characterController.setMinSlopeSlideAngle((30 * Math.PI) / 180);
-    this.characterController.enableAutostep(0.5, 0.2, true);
-    this.characterController.enableSnapToGround(0.5);
-    this.characterController.setApplyImpulsesToDynamicBodies(true);
-    this.characterController.setCharacterMass(1);
+      this.playerSpeed = 0;
+      this.playerRot = Quat(this.player.body.rotation()).toJson();
+
+      this.characterController = world.createCharacterController(0.01);
+      this.characterController.setSlideEnabled(true);
+      this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
+      this.characterController.setMinSlopeSlideAngle((30 * Math.PI) / 180);
+      this.characterController.enableAutostep(0.5, 0.2, true);
+      this.characterController.enableSnapToGround(0.5);
+      this.characterController.setApplyImpulsesToDynamicBodies(true);
+      this.characterController.setCharacterMass(1);
+    }
 
     const methodCameraCreate = `camera${this.options.cameraMode}Create`;
     const methodCameraUpdate = `camera${this.options.cameraMode}Update`;
@@ -975,6 +1113,12 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
     if (typeof this[methodCameraCreate] == "function") {
       this[methodCameraCreate]();
     }
+
+    this.root.input.keyboard("Numpad0", "keyup", () => {
+      let index = this.cameraModes.indexOf(this.options.cameraMode) + 1;
+      if (typeof this.cameraModes[index] == "undefined") index = 0;
+      this.cameraModeSet(this.cameraModes[index]);
+    });
 
     this.root.event.on("update", () => {
       if (typeof this[methodCameraUpdate] == "function") {
@@ -984,55 +1128,75 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
   }
 
   cameraFirstCreate() {
-    //
+    this.player.mesh.attach(this.root.game.camera);
   }
 
   cameraFirstUpdate() {
+    const { Vec3, Quat } = this.root.game.helpers;
+    this.root.game.camera.position.lerp(Vec3({ x: 0, y: 0, z: 0 }), 0.1);
+    this.root.game.camera.rotation.set(0, 0, 0);
     this.basicWasdMovimentationUpdate();
   }
 
   cameraThirdCreate() {
     this.player.mesh.attach(this.root.game.camera);
-    this.root.game.camera.position.set(0, 1, 2);
-    this.root.game.camera.rotation.set(-0.3, 0, 0);
   }
 
   cameraThirdUpdate() {
+    const { Vec3, Quat } = this.root.game.helpers;
+    this.root.game.camera.position.lerp(Vec3({ x: 0, y: 1, z: 2 }), 0.1);
+    this.root.game.camera.rotation.set(-0.3, 0, 0);
     this.basicWasdMovimentationUpdate();
   }
 
   basicWasdMovimentationUpdate() {
     const { Vec3, Quat } = this.root.game.helpers;
-    const delta = this.root.game.clock.getDelta();
+    // const delta = this.root.game.clock.getDelta();
     let playerPos = Vec3(this.player.body.translation());
-    let playerRotY = this.player.body.rotation().y;
 
-    let playerSpeed = 0;
+    // // playerPos.y -= 0.1;
+    // // playerPos.x = 0;
+    // // playerPos.z = 0;
 
-    if (this.root.input.keyboard.w) {
-      playerSpeed = this.options.playerSpeed;
-    }
-    if (this.root.input.keyboard.s) {
-      playerSpeed = -this.options.playerSpeed;
-    }
-    if (this.root.input.keyboard.a) {
-      playerRotY += 0.03;
-    }
-    if (this.root.input.keyboard.d) {
-      playerRotY -= 0.03;
+    this.playerSpeed = 0;
+
+    if (this.root.input.keyboard("w")) {
+      this.playerSpeed = this.options.playerSpeed;
     }
 
-    const directionVector = Vec3({ x: 0, y: 0, z: 1 })
-      .applyQuaternion(Quat(this.player.body.rotation()))
-      .multiplyScalar(playerSpeed * -1);
+    if (this.root.input.keyboard("s")) {
+      this.playerSpeed = -this.options.playerSpeed;
+    }
 
-    let pos = Vec3(this.player.body.translation()).add(directionVector);
-    playerPos.z = pos.z;
-    playerPos.x = pos.x;
-    this.player.body.setNextKinematicTranslation(playerPos);
+    if (this.root.input.keyboard("a")) {
+      this.playerRot.y += 0.03;
+    }
 
+    if (this.root.input.keyboard("d")) {
+      this.playerRot.y -= 0.03;
+    }
+
+    // let pos = Vec3(this.player.body.translation()).add(
+    //   Vec3({ x: 0, y: 0, z: 1 })
+    //     .applyQuaternion(Quat(this.player.body.rotation()))
+    //     .multiplyScalar(this.playerSpeed * -1)
+    // );
+
+    // this.characterController.computeColliderMovement(this.player.collider, pos);
+    // const translation = this.player.body.nextTranslation();
+    // const corrected = this.characterController.computedMovement();
+
+    // this.player.body.setNextKinematicTranslation({
+    //   x: pos.x + corrected.x,
+    //   y: pos.y + corrected.y,
+    //   z: pos.z + corrected.z,
+    // });
+
+    // this.player.body.setNextKinematicTranslation(corrected);
+
+    console.log(this.playerRot.y);
     this.player.body.setNextKinematicRotation(
-      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, playerRotY, 0))
+      Quat().setFromEuler(new THREE.Euler(0, this.playerRot.y, 0))
     );
   }
 };
