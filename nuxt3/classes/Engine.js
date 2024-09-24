@@ -1133,7 +1133,8 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
 
   cameraFirstUpdate() {
     const { Vec3, Quat } = this.root.game.helpers;
-    this.root.game.camera.position.lerp(Vec3({ x: 0, y: 0, z: 0 }), 0.1);
+    // this.root.game.camera.position.lerp(Vec3({ x: 0, y: 0, z: 0 }), 0.1);
+    this.root.game.camera.position.set(0, 0, 0);
     this.root.game.camera.rotation.set(0, 0, 0);
     this.basicWasdMovimentationUpdate();
   }
@@ -1144,7 +1145,8 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
 
   cameraThirdUpdate() {
     const { Vec3, Quat } = this.root.game.helpers;
-    this.root.game.camera.position.lerp(Vec3({ x: 0, y: 1, z: 2 }), 0.1);
+    // this.root.game.camera.position.lerp(Vec3({ x: 0, y: 1, z: 2 }), 0.1);
+    this.root.game.camera.position.set(0, 1, 2);
     this.root.game.camera.rotation.set(-0.3, 0, 0);
     this.basicWasdMovimentationUpdate();
   }
