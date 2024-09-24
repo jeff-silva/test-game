@@ -1105,6 +1105,32 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
       this.characterController.enableSnapToGround(0.5);
       this.characterController.setApplyImpulsesToDynamicBodies(true);
       this.characterController.setCharacterMass(1);
+
+      this.mouseMovement = { x: 0, y: 0 };
+
+      this.pointerLockControl = new (class {
+        constructor(parent) {
+          this.parent = parent;
+          this.root = parent.root;
+          this.root.canvas.el.addEventListener("pointermove", (ev) => {
+            if (!this.locked()) return;
+            this.pointerMoveHandler(ev);
+          });
+        }
+
+        lock() {
+          this.root.canvas.el.requestPointerLock();
+        }
+
+        locked() {
+          return document.pointerLockElement == this.root.canvas.el;
+        }
+
+        pointerMoveHandler(ev) {
+          this.parent.mouseMovement.x = ev.movementX;
+          this.parent.mouseMovement.y = ev.movementY;
+        }
+      })(this);
     }
 
     const methodCameraCreate = `camera${this.options.cameraMode}Create`;
@@ -1179,6 +1205,8 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
       // this.playerRot.y -= 0.03;
       charMoveFront.x = -1;
     }
+
+    // this.playerRot.y += this.mouseMovement.y / 10;
 
     charDirection
       .subVectors(charMoveFront, charMoveRight)

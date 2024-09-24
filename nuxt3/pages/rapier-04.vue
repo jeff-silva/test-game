@@ -64,6 +64,9 @@ class PlayerInstance extends Instance {
     );
 
     this.player.cameraModeSet("Third");
+    this.root.canvas.el.addEventListener("click", () => {
+      this.player.pointerLockControl.lock();
+    });
   }
 }
 
