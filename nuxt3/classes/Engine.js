@@ -55,6 +55,7 @@ export const Scene = class Scene {
     setTimeout(async () => {
       await RAPIER.init();
       await this.preload.init(this.preloadFiles());
+      console.log(this);
       this.create();
       this.update();
     }, 10);
@@ -69,6 +70,9 @@ export const Scene = class Scene {
     this.event.dispatch("create");
     this.instances.map((instance) => {
       instance.onCreate();
+      instance.scripts.map((script) => {
+        script.onCreate();
+      });
     });
   }
 
@@ -81,6 +85,9 @@ export const Scene = class Scene {
     this.event.dispatch("update");
     this.instances.map((instance) => {
       instance.onUpdate();
+      instance.scripts.map((script) => {
+        script.onUpdate();
+      });
     });
     requestAnimationFrame(() => this.update());
   }
@@ -116,6 +123,13 @@ export const Instance = class Instance {
   onCreate() {}
   onUpdate() {}
   onDestroy() {}
+
+  scripts = [];
+  scriptAdd(scriptInstance) {
+    scriptInstance.parent = this;
+    this.scripts.push(scriptInstance);
+    return scriptInstance;
+  }
 };
 
 export const Script = class Script {
@@ -310,8 +324,24 @@ class Game extends Base {
     const { width, height } = this.parent.canvas;
     const { canvas } = this.parent;
 
-    this.THREE = THREE;
     this.RAPIER = RAPIER;
+    this.THREE = THREE;
+
+    this.helpers = {
+      Vec3: (o = {}) => {
+        o = JSON.parse(JSON.stringify(o));
+        let r = new THREE.Vector3(o.x || 0, o.y || 0, o.z || 0);
+        r.toArray = () => [r.x, r.y, r.z];
+        r.toJson = () => ({ x: r.x, y: r.y, z: r.z });
+        return r;
+      },
+      Quat: (o = {}) => {
+        const r = new THREE.Quaternion(o.x || 0, o.y || 0, o.z || 0, o.w || 0);
+        r.toArray = () => [r.x, r.y, r.z, r.w];
+        r.toJson = () => ({ x: r.x, y: r.y, z: r.z, w: r.w });
+        return r;
+      },
+    };
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
@@ -701,13 +731,13 @@ class Physics extends Base {
     const shape = this.getRapierShape(options.physics, options.geometry);
 
     const r = this.dynamicBodyAdd({ mesh, body, shape });
-    console.log(`
-      uuid:      ${r.uuid}
-      geometry:  ${options.geometry.type}
-      material:  ${options.material.type}
-      physics:   ${options.physics.type}
-        - mass:  ${options.physics.mass}
-    `);
+    // console.log(`
+    //   uuid:      ${r.uuid}
+    //   geometry:  ${options.geometry.type}
+    //   material:  ${options.material.type}
+    //   physics:   ${options.physics.type}
+    //     - mass:  ${options.physics.mass}
+    // `);
     return r;
   }
 
@@ -862,3 +892,147 @@ class Debug {
     }
   }
 }
+
+export const CharacterCameraScript = class CharacterCameraScript extends Script {
+  root = null;
+  parent = null;
+  options = {};
+  player = null;
+  characterController = null;
+
+  constructor(parent = null, options = {}) {
+    super();
+    this.root = parent.parent;
+    this.parent = parent;
+    this.setOptions(options);
+  }
+
+  setOptions(options = {}) {
+    this.options = _.merge(
+      {
+        camera: null,
+        inputForward: ["w"],
+        inputBackward: ["s"],
+        inputLeft: ["a"],
+        inputRight: ["d"],
+        cameraMode: "First", // first, third
+        playerSpeed: 0.06,
+        playerMaterial: { type: "basic", color: 0xff0000 },
+        playerGeometry: { type: "capsule", radius: 0.2, length: 0.5 },
+        playerPosition: { x: 0, y: 0, z: 0 },
+        playerPhysics: {
+          type: "kinematicPositionBased",
+          mass: 1,
+          friction: 0,
+          restitution: 0,
+          linvel: { x: 1 },
+        },
+      },
+      this.options,
+      options
+    );
+
+    if (!this.options.camera) {
+      throw new Error("We need a camera");
+    }
+  }
+
+  onCreate() {
+    this.cameraInit();
+  }
+
+  cameraModeSet(mode) {
+    this.options.cameraMode = mode;
+    this.cameraInit();
+  }
+
+  cameraInit() {
+    const { RAPIER, THREE, clock } = this.root.game;
+    const { world } = this.root.physics;
+
+    // Restart and clear instance data
+    this.root.game.camera.parent = null;
+
+    this.player = this.root.physics.basicMeshAdd({
+      material: this.options.playerMaterial,
+      geometry: this.options.playerGeometry,
+      position: this.options.playerPosition,
+      physics: this.options.playerPhysics,
+    });
+
+    this.characterController = world.createCharacterController(0.01);
+    this.characterController.setSlideEnabled(true);
+    this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
+    this.characterController.setMinSlopeSlideAngle((30 * Math.PI) / 180);
+    this.characterController.enableAutostep(0.5, 0.2, true);
+    this.characterController.enableSnapToGround(0.5);
+    this.characterController.setApplyImpulsesToDynamicBodies(true);
+    this.characterController.setCharacterMass(1);
+
+    const methodCameraCreate = `camera${this.options.cameraMode}Create`;
+    const methodCameraUpdate = `camera${this.options.cameraMode}Update`;
+
+    if (typeof this[methodCameraCreate] == "function") {
+      this[methodCameraCreate]();
+    }
+
+    this.root.event.on("update", () => {
+      if (typeof this[methodCameraUpdate] == "function") {
+        this[methodCameraUpdate]();
+      }
+    });
+  }
+
+  cameraFirstCreate() {
+    //
+  }
+
+  cameraFirstUpdate() {
+    this.basicWasdMovimentationUpdate();
+  }
+
+  cameraThirdCreate() {
+    this.player.mesh.attach(this.root.game.camera);
+    this.root.game.camera.position.set(0, 1, 2);
+    this.root.game.camera.rotation.set(-0.3, 0, 0);
+  }
+
+  cameraThirdUpdate() {
+    this.basicWasdMovimentationUpdate();
+  }
+
+  basicWasdMovimentationUpdate() {
+    const { Vec3, Quat } = this.root.game.helpers;
+    const delta = this.root.game.clock.getDelta();
+    let playerPos = Vec3(this.player.body.translation());
+    let playerRotY = this.player.body.rotation().y;
+
+    let playerSpeed = 0;
+
+    if (this.root.input.keyboard.w) {
+      playerSpeed = this.options.playerSpeed;
+    }
+    if (this.root.input.keyboard.s) {
+      playerSpeed = -this.options.playerSpeed;
+    }
+    if (this.root.input.keyboard.a) {
+      playerRotY += 0.03;
+    }
+    if (this.root.input.keyboard.d) {
+      playerRotY -= 0.03;
+    }
+
+    const directionVector = Vec3({ x: 0, y: 0, z: 1 })
+      .applyQuaternion(Quat(this.player.body.rotation()))
+      .multiplyScalar(playerSpeed * -1);
+
+    let pos = Vec3(this.player.body.translation()).add(directionVector);
+    playerPos.z = pos.z;
+    playerPos.x = pos.x;
+    this.player.body.setNextKinematicTranslation(playerPos);
+
+    this.player.body.setNextKinematicRotation(
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, playerRotY, 0))
+    );
+  }
+};

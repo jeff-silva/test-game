@@ -10,8 +10,16 @@
 </template>
 
 <script setup>
-import { Scene, Instance, Script } from "@/classes/Engine.js";
+import {
+  Scene,
+  Instance,
+  Script,
+  CharacterCameraScript,
+} from "@/classes/Engine.js";
+
 import { THREE } from "enable3d";
+import { Vector } from "matter-js";
+import { Vector3 } from "three";
 const app = useApp();
 
 class GameScene extends Scene {
@@ -46,6 +54,19 @@ class LevelInstance extends Instance {
 }
 
 class PlayerInstance extends Instance {
+  onCreate() {
+    this.player = this.scriptAdd(
+      new CharacterCameraScript(this, {
+        camera: this.parent.game.camera,
+        playerPosition: { x: -2, y: 0.5, z: 1 },
+      })
+    );
+
+    this.player.cameraModeSet("Third");
+  }
+}
+
+class PlayerInstanceOld extends Instance {
   onCreate() {
     this.parent.game.camera.position.set(-4, 0, 4);
 
@@ -91,7 +112,8 @@ class PlayerInstance extends Instance {
   }
 
   initCharacterController() {
-    const { RAPIER, THREE } = this.parent.game;
+    const { RAPIER, THREE, clock } = this.parent.game;
+    const { Vec3, Quat } = this.parent.game.helpers;
     const { world } = this.parent.physics;
 
     this.characterController = world.createCharacterController(0.01);
@@ -103,60 +125,37 @@ class PlayerInstance extends Instance {
     this.characterController.setApplyImpulsesToDynamicBodies(true);
     this.characterController.setCharacterMass(1);
 
-    let movementDirection = { x: 0, y: -0.01, z: 0 };
-    let charRotation = { w: 0, x: 0, y: 0, z: 0 };
-    let speed = 0.05;
+    let playerMove = Vec3({ x: 0, y: -0.01, z: 0 });
+    let playerRot = { w: 0, x: 0, y: 0, z: 0 };
+    let playerSpeed = 0.05;
 
     this.player.mesh.attach(this.parent.game.camera);
+    // this.player.mesh.position.set(-3, 1, 0);
     this.parent.game.camera.position.set(0, 1, 2);
     this.parent.game.camera.rotation.set(-0.3, 0, 0);
 
     this.parent.event.on("update", () => {
-      // this.parent.game.camera.lookAt(this.player.mesh.position);
+      const delta = this.parent.game.clock.getDelta();
 
-      // let charPos = this.player.body.translation();
-      // const charPos = new THREE.Vector3(this.player.body.translation());
-      // const charPos = new THREE.Vector3(0, 0, 4);
-      // this.parent.game.camera.position.lerp(charPos, 0.01);
-      // console.log({ charPos });
-
-      movementDirection.x = 0;
-      movementDirection.z = 0;
-
-      if (this.parent.input.keyboard.w) {
-        movementDirection.z = speed;
-      }
-      if (this.parent.input.keyboard.s) {
-        movementDirection.z = -speed;
-      }
-      if (this.parent.input.keyboard.a) {
-        movementDirection.x = -speed;
-      }
-      if (this.parent.input.keyboard.d) {
-        // movementDirection.x = speed;
-        charRotation.y += 0.01;
-        // this.player.body.setRotation(charRotation);
-        this.player.body.setNextKinematicRotation(charRotation);
-      }
-
-      console.log(JSON.stringify(charRotation));
+      playerMove.x = 0;
+      playerMove.z = 0;
 
       // const grounded = this.characterController.computedGrounded();
       // console.log({ grounded });
 
-      this.characterController.computeColliderMovement(
-        this.player.collider,
-        movementDirection
-      );
+      // this.characterController.computeColliderMovement(
+      //   this.player.collider,
+      //   playerMove
+      // );
 
-      const translation = this.player.body.nextTranslation();
-      const corrected = this.characterController.computedMovement();
+      // const translation = this.player.body.nextTranslation();
+      // const corrected = this.characterController.computedMovement();
 
-      this.player.body.setNextKinematicTranslation({
-        x: translation.x + corrected.x,
-        y: translation.y + corrected.y,
-        z: translation.z + corrected.z,
-      });
+      // this.player.body.setNextKinematicTranslation({
+      //   x: translation.x + corrected.x,
+      //   y: translation.y + corrected.y,
+      //   z: translation.z + corrected.z,
+      // });
 
       // const colls = this.characterController.numComputedCollisions();
       // console.log(colls);
@@ -166,20 +165,49 @@ class PlayerInstance extends Instance {
       //   console.log(i);
       // }
 
-      // this.characterController.computeColliderMovement(
-      //   this.player.collider,
-      //   velocity
-      // );
-
-      // const correctedMovement = this.characterController.computedMovement();
-      // const translation = this.player.body.translation();
-      // // translation.y -= 0.01;
-      // this.player.body.setNextKinematicTranslation({
-      //   x: translation.x + correctedMovement.x,
-      //   y: translation.y + correctedMovement.y,
-      //   z: translation.z + correctedMovement.z,
-      // });
+      // Teste movimento rotação
+      (() => {
+        if (this.parent.input.keyboard.a) {
+          playerRot.y += 0.03;
+        }
+        if (this.parent.input.keyboard.d) {
+          playerRot.y -= 0.03;
+        }
+        this.player.body.setNextKinematicRotation(
+          new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(0, playerRot.y, 0)
+          )
+        );
+      })();
     });
+
+    // Teste movimento frente/tras
+    (() => {
+      let playerSpeed = 0;
+      let pos = Vec3(this.player.body.translation());
+
+      this.parent.event.on("update", () => {
+        const delta = clock.getDelta();
+        playerSpeed = 0;
+
+        if (this.parent.input.keyboard.w) {
+          playerSpeed = 0.06;
+        }
+        if (this.parent.input.keyboard.s) {
+          playerSpeed = -0.06;
+        }
+
+        const directionVector = Vec3({ x: 0, y: 0, z: 1 })
+          .applyQuaternion(Quat(this.player.body.rotation()))
+          .multiplyScalar(playerSpeed * -1);
+        let newpos = Vec3(this.player.body.translation()).add(directionVector);
+
+        pos.z = newpos.z;
+        pos.x = newpos.x;
+
+        this.player.body.setNextKinematicTranslation(pos);
+      });
+    })();
   }
 
   initMovement() {
