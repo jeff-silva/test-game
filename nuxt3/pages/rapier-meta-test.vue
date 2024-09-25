@@ -16,7 +16,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const app = useApp();
 
-class ThreeEngine {
+class ThreeRapierEngine {
   constructor(options = {}) {
     this.options = {
       el: null,
@@ -29,19 +29,21 @@ class ThreeEngine {
   async init() {
     this.busy = true;
     await RAPIER.init();
+    this.THREE = THREE;
+    this.RAPIER = RAPIER;
     if (!this.options.el) throw new Error("options.el not defined");
     this.canvas = document.querySelector(this.options.el);
     this.width = this.canvas.offsetWidth;
     this.height = this.canvas.offsetHeight;
     this.aspect = this.width / this.height;
     this.scene = new THREE.Scene();
+    this.scene.background = null;
     this.camera = new THREE.PerspectiveCamera(50, this.aspect, 1, 100);
     this.clock = new THREE.Clock();
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.canvas.innerHTML = "";
     this.canvas.style.position = "relative";
     this.canvas.style.minHeight = "100px";
-    this.canvas.style.background = "#f5f5f5";
     this.canvas.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.width = "100%";
     this.renderer.domElement.style.height = "100%";
@@ -49,6 +51,7 @@ class ThreeEngine {
     this.assets = await this.assetsLoad();
     this.busy = false;
     window.addEventListener("resize", () => this.resize());
+    this.onCreate();
     this.update();
   }
 
@@ -62,13 +65,14 @@ class ThreeEngine {
   }
 
   update() {
+    this.onUpdate();
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(() => this.update());
   }
 
   assetsLoad() {
     return new Promise((resolve, reject) => {
-      let files = this.options.assets;
+      let files = this.preload();
 
       if (Object.entries(files).length == 0) {
         resolve({});
@@ -104,66 +108,51 @@ class ThreeEngine {
       });
     });
   }
+
+  preload() {
+    return {};
+  }
+
+  onCreate() {
+    //
+  }
+
+  onUpdate() {
+    //
+  }
 }
 
-const assetsLoad = (files = {}, options = {}) => {
-  return new Promise((resolve, reject) => {
-    options = {
-      onProgress: () => null,
-      onLoad: () => null,
-      ...options,
-    };
-
-    if (Object.entries(files).length == 0) {
-      resolve({});
-    }
-
-    const modelLoaders = {
-      gltf: (item) => {
-        return new GLTFLoader(manager).load(item.url, (gltf) => {
-          item.loaded = true;
-          item.content = gltf;
-        });
+class Game extends ThreeRapierEngine {
+  preload() {
+    return {
+      scene: {
+        url: app.baseUrl("assets/threejs/models/rapier-meta-test/scene.gltf"),
       },
     };
+  }
 
-    const manager = Object.assign(new THREE.LoadingManager(), {
-      onProgress: (url, itemsLoaded, itemsTotal) => {
-        let data = { url, itemsLoaded, itemsTotal };
-        data.progress = (itemsLoaded / itemsTotal) * 100;
-        options.onProgress(data);
-      },
-      onLoad: () => {
-        resolve(files);
-        options.onLoad(files);
-      },
-    });
+  onCreate() {
+    this.scene.add(this.assets.scene.content.scene);
+    // const geometry = new THREE.BoxGeometry(1, 1, 1);
+    // const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    // this.scene.add((this.cube = new THREE.Mesh(geometry, material)));
+    // this.camera.position.set(0, 0, 2);
+  }
 
-    Object.entries(files).map(([name, item]) => {
-      item.loaded = false;
-      item.ext = item.url.split("?").at(0).split(".").at(-1);
-      item.content = null;
+  onUpdate() {
+    // this.cube.rotation.x += 0.01;
+    // this.cube.rotation.y += 0.01;
+    // this.cube.rotation.z += 0.01;
+  }
+}
 
-      if (typeof modelLoaders[item.ext] == "function") {
-        modelLoaders[item.ext](item);
-      }
-    });
-  });
-};
-
-const engine = new ThreeEngine({
+const game = new Game({
   el: "#game",
   debug: true,
-  assets: {
-    scene: {
-      url: app.baseUrl("assets/threejs/models/rapier-meta-test/scene.gltf"),
-    },
-  },
 });
 
 onMounted(async () => {
-  await engine.init();
-  console.log(engine);
+  await game.init();
   // scene.add(assets.scene.content.scene);
 });
 
