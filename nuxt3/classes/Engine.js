@@ -29,7 +29,6 @@ export const Scene = class Scene {
   instances = [];
 
   constructor(options = {}) {
-    // console.clear();
     this.options = {
       ...this.options,
       ...options,
@@ -61,6 +60,7 @@ export const Scene = class Scene {
   }
 
   create() {
+    console.log("create", this);
     this.extensions().map((item) => {
       this[item.name]["onCreate"]();
     });
@@ -473,7 +473,7 @@ class Game extends Base {
     };
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
+    this.camera = new THREE.PerspectiveCamera(50, width / height, 1, 100);
     this.clock = new THREE.Clock();
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -1090,7 +1090,7 @@ export const CharacterCameraScript = class CharacterCameraScript extends Script 
     // this.root.game.camera.removeFromParent();
 
     if (!this.player) {
-      this.characterController = world.createCharacterController(0.01);
+      this.characterController = world.createCharacterController(0.1);
       this.characterController.setSlideEnabled(true);
       this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
       this.characterController.setMinSlopeSlideAngle((30 * Math.PI) / 180);

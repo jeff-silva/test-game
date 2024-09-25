@@ -1,0 +1,11 @@
+Model Information:
+* title:	Telluride, Colorado produced with TerraTools
+* source:	https://sketchfab.com/3d-models/telluride-colorado-produced-with-terratools-75eda0fe92cc4a4b975b7a7fbd43d0ce
+* author:	C8X (https://sketchfab.com/c8x)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Telluride, Colorado produced with TerraTools" (https://sketchfab.com/3d-models/telluride-colorado-produced-with-terratools-75eda0fe92cc4a4b975b7a7fbd43d0ce) by C8X (https://sketchfab.com/c8x) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

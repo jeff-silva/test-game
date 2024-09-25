@@ -7,7 +7,9 @@
       <nuxt-link to="/rapier-01">/rapier-01</nuxt-link>
       <nuxt-link to="/rapier-02">/rapier-02</nuxt-link>
       <nuxt-link to="/rapier-03">/rapier-03</nuxt-link>
-      <nuxt-link to="/rapier-04">/rapier-04</nuxt-link>
+      <nuxt-link to="/rapier-car">/rapier-car</nuxt-link>
+      <nuxt-link to="/rapier-player">/rapier-player</nuxt-link>
+      <nuxt-link to="/rapier-meta-test">/rapier-meta-test</nuxt-link>
     </div>
     <div style="padding: 10px">
       <slot></slot>
