@@ -2,7 +2,7 @@
   <nuxt-layout name="main">
     <div
       id="game"
-      style="width: 100%; height: 400px; position: relative"
+      style="width: 100%; height: 600px; position: relative"
     ></div>
     <a href="">Refresh</a>
   </nuxt-layout>
@@ -13,6 +13,9 @@ import RAPIER from "@dimforge/rapier3d-compat";
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+import _ from "lodash";
 
 const app = useApp();
 
@@ -27,47 +30,147 @@ class ThreeRapierEngine {
   }
 
   async init() {
+    if (!this.options.el) throw new Error("options.el not defined");
     this.busy = true;
-    await RAPIER.init();
+
     this.THREE = THREE;
     this.RAPIER = RAPIER;
-    if (!this.options.el) throw new Error("options.el not defined");
-    this.canvas = document.querySelector(this.options.el);
-    this.width = this.canvas.offsetWidth;
-    this.height = this.canvas.offsetHeight;
-    this.aspect = this.width / this.height;
-    this.scene = new THREE.Scene();
-    this.scene.background = null;
-    this.camera = new THREE.PerspectiveCamera(50, this.aspect, 1, 100);
-    this.clock = new THREE.Clock();
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.canvas.innerHTML = "";
-    this.canvas.style.position = "relative";
-    this.canvas.style.minHeight = "100px";
-    this.canvas.appendChild(this.renderer.domElement);
-    this.renderer.domElement.style.width = "100%";
-    this.renderer.domElement.style.height = "100%";
-    this.resize();
-    this.assets = await this.assetsLoad();
+
+    await this.rapierInit();
+    await this.threeInit();
+    await this.helpersInit();
+
     this.busy = false;
-    window.addEventListener("resize", () => this.resize());
-    this.onCreate();
+
+    this.create();
     this.update();
   }
 
   resize() {
+    const oldSize = { width: this.width, height: this.height };
     this.width = this.canvas.offsetWidth;
     this.height = this.canvas.offsetHeight;
     this.aspect = this.width / this.height;
     this.renderer.setSize(this.width, this.height);
     this.camera.aspect = this.aspect;
     this.camera.updateProjectionMatrix();
+    this.dispatch("resize", { oldSize });
+  }
+
+  create() {
+    this.onCreate();
+    this.dispatch("create");
   }
 
   update() {
     this.onUpdate();
+    this.dispatch("update");
+
+    if (this.debug) {
+      this.debug.update();
+    }
+
+    for (let uuid in this.rapierPhysics) {
+      const { mesh, body, shape } = this.rapierPhysics[uuid];
+
+      if (typeof body.translation == "function") {
+        mesh.position.copy(body.translation());
+      }
+      if (typeof body.rotation == "function") {
+        mesh.quaternion.copy(body.rotation());
+      }
+    }
+
+    const delta = this.clock.getDelta();
+    this.world.timestep = Math.min(delta, 0.1);
+    this.world.step();
+
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(() => this.update());
+    // setTimeout(() => this.update(), 1000);
+  }
+
+  async rapierInit() {
+    await RAPIER.init();
+    this.world = new RAPIER.World({ x: 0.0, y: -9.81, z: 0.0 });
+    this.debug = null;
+
+    if (this.options.debug) {
+      setTimeout(() => {
+        this.debug = new (class {
+          constructor(parent) {
+            this.parent = parent;
+            this.mesh = new THREE.LineSegments(
+              new THREE.BufferGeometry(),
+              new THREE.LineBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+              })
+            );
+            this.mesh.frustumCulled = false;
+            this.parent.scene.add(this.mesh);
+          }
+
+          update() {
+            const { vertices, colors } = this.parent.world.debugRender();
+            this.mesh.geometry.setAttribute(
+              "position",
+              new THREE.BufferAttribute(vertices, 3)
+            );
+            this.mesh.geometry.setAttribute(
+              "color",
+              new THREE.BufferAttribute(colors, 4)
+            );
+          }
+        })(this);
+      }, 10);
+    }
+  }
+
+  async threeInit() {
+    this.canvas = document.querySelector(this.options.el);
+    this.width = this.canvas.offsetWidth;
+    this.height = this.canvas.offsetHeight;
+    this.aspect = this.width / this.height;
+    this.scene = new THREE.Scene();
+    this.scene.background = null;
+    this.camera = new THREE.PerspectiveCamera(50, this.aspect, 1, 1000);
+    this.clock = new THREE.Clock();
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    this.renderer.gammaOutput = true;
+    // this.renderer.shadowMap.enabled = true;
+    // this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    this.canvas.innerHTML = "";
+    this.canvas.style.position = "relative";
+    this.canvas.style.minHeight = "100px";
+    this.canvas.appendChild(this.renderer.domElement);
+
+    this.renderer.domElement.style.width = "100%";
+    this.renderer.domElement.style.height = "100%";
+
+    this.resize();
+    window.addEventListener("resize", () => this.resize());
+    this.assets = await this.assetsLoad();
+  }
+
+  helpers = {};
+  async helpersInit() {
+    this.helpers.Vec3 = (o = {}) => {
+      o = JSON.parse(JSON.stringify(o));
+      let r = new THREE.Vector3(o.x || 0, o.y || 0, o.z || 0);
+      r.toArray = () => [r.x, r.y, r.z];
+      r.toJson = () => ({ x: r.x, y: r.y, z: r.z });
+      return r;
+    };
+
+    this.helpers.Quat = (o = {}) => {
+      const r = new THREE.Quaternion(o.x || 0, o.y || 0, o.z || 0, o.w || 0);
+      r.toArray = () => [r.x, r.y, r.z, r.w];
+      r.toJson = () => ({ x: r.x, y: r.y, z: r.z, w: r.w });
+      return r;
+    };
   }
 
   assetsLoad() {
@@ -109,6 +212,449 @@ class ThreeRapierEngine {
     });
   }
 
+  events = [];
+
+  on(event, call) {
+    this.events.push({ event, call });
+  }
+
+  dispatch(...args) {
+    const event = args.shift();
+    this.events.map((e) => {
+      if (e.event != event) return;
+      e.call(...args);
+    });
+  }
+
+  uuid() {
+    let d = _.now();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+      /[xy]/g,
+      function (c) {
+        let r = (d + _.random(16)) % 16 | 0;
+        d = Math.floor(d / 16);
+        return (c == "x" ? r : (r & 0x3) | 0x8).toString(16);
+      }
+    );
+  }
+
+  switch(option, options = {}, def = null) {
+    return options[option] ? options[option]() : def;
+  }
+
+  threeMeshOptions(options = {}) {
+    return _.merge(
+      {
+        geometry: {
+          type: "box",
+          radius: 1,
+          length: 1,
+          capSegments: 4,
+          radialSegments: 8,
+          heightSegments: 16,
+          openEnded: false,
+          thetaStart: 0,
+          width: 1,
+          height: 1,
+          depth: 1,
+          thetaLength: Math.PI * 2,
+          radiusTop: 1,
+          radiusBottom: 1,
+          widthSegments: 32,
+          phiStart: 0,
+          phiLength: Math.PI * 2,
+        },
+        material: {
+          type: "basic",
+          color: 0xffffff,
+        },
+        mesh: {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0, w: 0 },
+        },
+      },
+      options
+    );
+  }
+
+  threeMesh(options = {}) {
+    options = this.threeMeshOptions(options);
+
+    const geometry = this.switch(options.geometry.type, {
+      box: () => {
+        return new THREE.BoxGeometry(
+          options.geometry.width,
+          options.geometry.height,
+          options.geometry.depth
+        );
+      },
+      capsule: () => {
+        return new THREE.CapsuleGeometry(
+          options.geometry.radius,
+          options.geometry.length,
+          options.geometry.capSegments,
+          options.geometry.radialSegments
+        );
+      },
+      cone: () => {
+        return new THREE.ConeGeometry(
+          options.geometry.radius,
+          options.geometry.height,
+          options.geometry.radialSegments,
+          options.geometry.heightSegments,
+          options.geometry.openEnded,
+          options.geometry.thetaStart,
+          options.geometry.thetaLength
+        );
+      },
+      cylinder: () => {
+        return new THREE.CylinderGeometry(
+          options.geometry.radiusTop,
+          options.geometry.radiusBottom,
+          options.geometry.height,
+          options.geometry.radialSegments,
+          options.geometry.heightSegments,
+          options.geometry.openEnded,
+          options.geometry.thetaStart,
+          options.geometry.thetaLength
+        );
+      },
+      plane: () => {
+        return new THREE.PlaneGeometry(
+          options.geometry.width,
+          options.geometry.height,
+          options.geometry.widthSegments,
+          options.geometry.heightSegments
+        );
+      },
+      sphere: () => {
+        return new THREE.SphereGeometry(
+          options.geometry.radius,
+          options.geometry.widthSegments,
+          options.geometry.heightSegments,
+          options.geometry.phiStart,
+          options.geometry.phiLength,
+          options.geometry.thetaStart,
+          options.geometry.thetaLength
+        );
+      },
+    });
+
+    let optionsMaterial = { ...options.material };
+    delete optionsMaterial.type;
+    const material = this.switch(options.material.type, {
+      basic: () => new THREE.MeshBasicMaterial(optionsMaterial),
+      depth: () => new THREE.MeshDepthMaterial(optionsMaterial),
+      lambert: () => new THREE.MeshLambertMaterial(optionsMaterial),
+      matcap: () => new THREE.MeshMatcapMaterial(optionsMaterial),
+      normal: () => new THREE.MeshNormalMaterial(optionsMaterial),
+      phong: () => new THREE.MeshPhongMaterial(optionsMaterial),
+      physical: () => new THREE.MeshPhysicalMaterial(optionsMaterial),
+      standard: () => new THREE.MeshStandardMaterial(optionsMaterial),
+      toon: () => new THREE.MeshToonMaterial(optionsMaterial),
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(
+      options.mesh.position.x || 0,
+      options.mesh.position.y || 0,
+      options.mesh.position.z || 0
+    );
+    mesh.quaternion.set(
+      options.mesh.rotation.x || 0,
+      options.mesh.rotation.y || 0,
+      options.mesh.rotation.z || 0,
+      options.mesh.rotation.w || 0
+    );
+
+    return mesh;
+  }
+
+  rapierPhysicsOptions(options = {}) {
+    return _.merge(
+      {
+        canSleep: false,
+        restitution: 1.1,
+        mass: 1,
+        friction: 0.5,
+        sensor: false,
+        linvel: { x: 0, y: 0, z: 0 },
+        angvel: { x: 0, y: 0, z: 0 },
+      },
+      options
+    );
+  }
+
+  rapierBody(options) {
+    options = _.merge(
+      {
+        type: "dynamic",
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0, w: 0 },
+      },
+      this.rapierPhysicsOptions(options)
+    );
+
+    let rigidBodyDesc = this.switch(options.type, {
+      dynamic: () => {
+        return RAPIER.RigidBodyDesc.dynamic();
+      },
+      fixed: () => {
+        return RAPIER.RigidBodyDesc.fixed();
+      },
+      kinematicVelocityBased: () => {
+        return RAPIER.RigidBodyDesc.kinematicVelocityBased();
+      },
+      kinematicPositionBased: () => {
+        return RAPIER.RigidBodyDesc.kinematicPositionBased();
+      },
+    });
+
+    return this.world.createRigidBody(
+      rigidBodyDesc
+        .setTranslation(
+          options.position.x || 0,
+          options.position.y || 0,
+          options.position.z || 0
+        )
+        .setRotation({ x: 0, y: 0, z: 0, w: 0, ...options.rotation })
+        .setCanSleep(options.canSleep)
+        .setLinvel(options.linvel.x, options.linvel.y, options.linvel.z)
+        .setAngvel(options.angvel)
+    );
+  }
+
+  rapierShape(options) {
+    options = _.merge(
+      {
+        type: "box",
+        geometry: { width: 1, height: 1, depth: 1, length: 1, radius: 1 },
+        mesh: null,
+      },
+      this.rapierPhysicsOptions(options)
+    );
+
+    if (options.type == "trimesh") {
+      if (!options.mesh) {
+        throw new Error(`"mesh" param is required for type "trimesh"`);
+      }
+      if (!options.mesh.isMesh) {
+        throw new Error(`Param "mesh.isMesh" is false. This need to be true`);
+      }
+    }
+
+    const geometry = options.geometry;
+    let shape = this.switch(options.type, {
+      box: () => {
+        return RAPIER.ColliderDesc.cuboid(
+          geometry.width / 2,
+          geometry.height / 2,
+          geometry.depth / 2
+        );
+      },
+      capsule: () => {
+        return RAPIER.ColliderDesc.capsule(
+          geometry.length / 2,
+          geometry.radius
+        );
+      },
+      cone: () => null,
+      cylinder: () => null,
+      plane: () => null,
+      sphere: () => {
+        return RAPIER.ColliderDesc.ball(geometry.radius);
+      },
+      trimesh: () => {
+        const geometry2 = options.mesh.geometry.clone();
+        geometry2.applyMatrix4(options.mesh.matrixWorld);
+        geometry2.computeVertexNormals();
+        let vertices = geometry2.attributes.position.array;
+        let indices = geometry2.index.array;
+
+        return RAPIER.ColliderDesc.trimesh(
+          new Float32Array(new Float32Array(vertices)),
+          new Uint32Array(new Uint32Array(indices))
+        ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+      },
+    });
+
+    if (!shape) {
+      throw new Error(`Undefined shape "${geometry.type}"`);
+    }
+
+    return shape
+      .setMass(options.mass)
+      .setRestitution(options.restitution)
+      .setFriction(options.friction)
+      .setSensor(options.sensor);
+  }
+
+  rapierPhysics = {};
+  rapierPhysicsAdd(mesh, body, shape) {
+    const uuid = this.uuid();
+    const collider = this.world.createCollider(shape, body);
+    const item = { uuid, mesh, body, shape, collider };
+    this.rapierPhysics[uuid] = item;
+    return item;
+  }
+
+  rapierPhysicsApply(mesh, options = {}) {
+    options = _.merge(
+      this.rapierPhysicsOptions(),
+      {
+        body: "dynamic",
+        shape: "box",
+      },
+      options
+    );
+
+    let body = this.rapierBody({
+      type: options.body,
+      ...options,
+      position: {
+        x: mesh.position.x,
+        y: mesh.position.y,
+        z: mesh.position.z,
+      },
+      rotation: {
+        x: mesh.rotation.x,
+        y: mesh.rotation.y,
+        z: mesh.rotation.z,
+      },
+    });
+    let shape = this.rapierShape({ type: options.shape, ...options, mesh });
+    return this.rapierPhysicsAdd(mesh, body, shape);
+  }
+
+  characterCameraControllerCreate(options = {}) {
+    return new (class {
+      constructor(parent, options) {
+        this.parent = parent;
+
+        this.options = _.merge(
+          {
+            input: {
+              forward: ["w"],
+              backward: ["s"],
+              left: ["a"],
+              right: ["d"],
+              jumb: ["Space"],
+            },
+            camera: {
+              type: "First",
+            },
+            mouse: {
+              sensitivity: 0.5,
+            },
+            player: {
+              speed: 0.06,
+              jumpForce: 0.02,
+              position: { x: 0, y: 0, z: 0 },
+              mesh: {
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+              },
+            },
+          },
+          options
+        );
+
+        this.controller = parent.world.createCharacterController(0.01);
+        this.controller.setSlideEnabled(true); // Allow sliding down hill
+        this.controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180); // Don’t allow climbing slopes larger than 45 degrees.
+        this.controller.setMinSlopeSlideAngle((30 * Math.PI) / 180); // Automatically slide down on slopes smaller than 30 degrees.
+        this.controller.enableAutostep(0.5, 0.2, true); // (maxHeight, minWidth, includeDynamicBodies) Stair behavior
+        this.controller.enableSnapToGround(0.5); // (distance) Set ground snap behavior
+        this.controller.setApplyImpulsesToDynamicBodies(true); // Add push behavior
+        this.controller.setCharacterMass(1);
+
+        this.player = {
+          // speed: 0,
+          // gravity: 0,
+          mesh: this.parent.threeMesh({
+            material: { type: "basic", color: 0xff0000 },
+            geometry: { type: "capsule", radius: 1, length: 1.7 },
+            mesh: this.options.player.mesh,
+          }),
+          body: this.parent.rapierBody({
+            type: "kinematicPositionBased",
+            position: this.options.player.mesh.position,
+            rotation: this.options.player.mesh.rotation,
+          }),
+          shape: this.parent.rapierShape({
+            type: "capsule",
+            radius: 1,
+            length: 1.7,
+          }),
+          collider: null,
+        };
+
+        this.parent.scene.add(this.player.mesh);
+
+        this.player = this.parent.rapierPhysicsAdd(
+          this.player.mesh,
+          this.player.body,
+          this.player.shape
+        );
+
+        // Player variables
+        this.player.speed = 0;
+        this.player.gravity = 0;
+        this.player.grounded = false;
+
+        this.parent.on("update", () => {
+          const { Vec3, Quat } = this.parent.helpers;
+
+          this.player.grounded = this.controller.computedGrounded();
+          this.player.gravity = this.player.grounded
+            ? 0
+            : Math.max(-9.2, this.player.gravity - 0.005);
+
+          let charDirection = Vec3();
+          let charMoveFront = Vec3();
+          let charMoveRight = Vec3();
+
+          this.player.speed = 0;
+
+          charDirection
+            .subVectors(charMoveFront, charMoveRight)
+            .normalize()
+            .multiplyScalar(this.options.player.speed * -1);
+
+          const cameraWorldDirection = this.parent.camera.getWorldDirection(
+            new THREE.Vector3()
+          );
+
+          const cameraYaw = Math.atan2(
+            cameraWorldDirection.x,
+            cameraWorldDirection.z
+          );
+
+          charDirection
+            .applyAxisAngle(Vec3({ x: 0, y: 1, z: 0 }), cameraYaw)
+            .multiplyScalar(-1);
+
+          const charMoveDirection = {
+            x: charDirection.x,
+            y: this.player.gravity,
+            z: charDirection.z,
+          };
+
+          this.controller.computeColliderMovement(
+            this.player.collider,
+            charMoveDirection
+          );
+
+          this.player.body.setNextKinematicTranslation(
+            Vec3()
+              .copy(this.player.body.translation())
+              .add(this.controller.computedMovement())
+          );
+        });
+      }
+    })(this, options);
+  }
+
   preload() {
     return {};
   }
@@ -132,17 +678,63 @@ class Game extends ThreeRapierEngine {
   }
 
   onCreate() {
-    this.scene.add(this.assets.scene.content.scene);
-    // const geometry = new THREE.BoxGeometry(1, 1, 1);
-    // const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    // this.scene.add((this.cube = new THREE.Mesh(geometry, material)));
-    // this.camera.position.set(0, 0, 2);
+    this.initScene();
+    this.initTest();
+    this.orbitControlsInit();
+    this.player = this.characterCameraControllerCreate({
+      player: {
+        mesh: {
+          position: { x: 0, y: 10, z: 0 },
+        },
+      },
+    });
   }
 
-  onUpdate() {
-    // this.cube.rotation.x += 0.01;
-    // this.cube.rotation.y += 0.01;
-    // this.cube.rotation.z += 0.01;
+  orbitControlsInit() {
+    this.orbitControls = new OrbitControls(
+      this.camera,
+      this.renderer.domElement
+    );
+
+    this.camera.position.set(0, 10, 10);
+
+    this.on("update", () => {
+      this.orbitControls.update();
+    });
+  }
+
+  initScene() {
+    let sceneModel = this.assets.scene.content.scene;
+    sceneModel.castShadow = true;
+    sceneModel.receiveShadow = true;
+    sceneModel.traverse((mesh) => {
+      if (mesh.isMesh) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+
+        this.rapierPhysicsApply(mesh, {
+          body: "fixed",
+          shape: "trimesh",
+        });
+      }
+    });
+    this.scene.add(sceneModel);
+  }
+
+  initTest() {
+    for (let x = 0; x <= 10; x += 2) {
+      for (let z = 0; z <= 10; z += 2) {
+        const mesh = this.threeMesh({
+          geometry: { type: "box" },
+          material: { type: "basic", color: 0x00ff00 },
+          mesh: {
+            position: { x, y: 5, z },
+          },
+        });
+        this.scene.add(mesh);
+        this.rapierPhysicsApply(mesh);
+      }
+    }
   }
 }
 
