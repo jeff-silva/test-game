@@ -569,8 +569,6 @@ class ThreeRapierEngine {
         this.controller.setCharacterMass(1);
 
         this.player = {
-          // speed: 0,
-          // gravity: 0,
           mesh: this.parent.threeMesh({
             material: { type: "basic", color: 0xff0000 },
             geometry: { type: "capsule", radius: 1, length: 1.7 },
