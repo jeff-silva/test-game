@@ -1,0 +1,11 @@
+Model Information:
+* title:	Ford Focus Low Poly
+* source:	https://sketchfab.com/3d-models/ford-focus-low-poly-8b290646b8f14cbb80b8a6ff7b1820c1
+* author:	Iron Minecart2 (https://sketchfab.com/iron_minecart2)
+
+Model License:
+* license type:	CC-BY-ND-4.0 (http://creativecommons.org/licenses/by-nd/4.0/)
+* requirements:	Author must be credited. Modified versions can not be distributed. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Ford Focus Low Poly" (https://sketchfab.com/3d-models/ford-focus-low-poly-8b290646b8f14cbb80b8a6ff7b1820c1) by Iron Minecart2 (https://sketchfab.com/iron_minecart2) licensed under CC-BY-ND-4.0 (http://creativecommons.org/licenses/by-nd/4.0/)

@@ -1,0 +1,79 @@
+<template>
+  <nuxt-layout name="main">
+    <div
+      id="game"
+      style="width: 100%; height: 600px; position: relative"
+    ></div>
+    <a href="">Refresh</a>
+  </nuxt-layout>
+</template>
+
+<script setup>
+import {
+  ThreeRapierEngine,
+  ThreeRapierScript,
+} from "@/classes/ThreeRapierEngine.js";
+
+const app = useApp();
+
+class Game extends ThreeRapierEngine {
+  preload() {
+    return {
+      scene: {
+        url: app.baseUrl("scenes/terrain/scene.gltf"),
+      },
+      car: {
+        url: app.baseUrl("models/car-01/scene.gltf"),
+      },
+    };
+  }
+
+  onCreate() {
+    this.scene.add(this.assets.scene.content.scene);
+
+    this.rapierPhysicsApply("Plane", "fixed", (engine, options) => {
+      const { RAPIER } = engine;
+
+      const geometry = options.mesh.geometry.clone();
+      geometry.applyMatrix4(options.mesh.matrix);
+      geometry.computeVertexNormals();
+
+      let vertices = new Float32Array(geometry.attributes.position.array);
+      let indexes = new Float32Array(geometry.index.array);
+
+      for (let i = 1; i < vertices.length; i += 3) {
+        vertices[i] += 18;
+      }
+
+      return RAPIER.ColliderDesc.trimesh(vertices, indexes).setActiveEvents(
+        RAPIER.ActiveEvents.COLLISION_EVENTS
+      );
+    });
+
+    const carMesh = this.assets.car.content.scene;
+    this.rapierPhysicsApply(carMesh, "dynamic", "box");
+    this.scene.add(carMesh);
+    console.log(carMesh);
+
+    this.orbitControls = this.getOrbitControls();
+    this.camera.position.set(0, 300, 300);
+
+    // this.on("update", () => {
+    //   carMesh.position.copy(this.camera.position);
+    // });
+  }
+}
+
+const game = new Game({
+  el: "#game",
+  debug: true,
+});
+
+onMounted(async () => {
+  await game.init();
+});
+
+onUnmounted(() => {
+  location.reload();
+});
+</script>

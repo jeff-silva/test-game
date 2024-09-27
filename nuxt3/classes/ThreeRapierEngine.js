@@ -454,39 +454,60 @@ export class ThreeRapierEngine {
     }
 
     const geometry = options.geometry;
-    let shape = this.switch(options.type, {
-      box: () => {
-        return RAPIER.ColliderDesc.cuboid(
-          geometry.width,
-          geometry.height,
-          geometry.depth
-        );
-      },
-      capsule: () => {
-        return RAPIER.ColliderDesc.capsule(
-          geometry.length / 2,
-          geometry.radius
-        );
-      },
-      cone: () => null,
-      cylinder: () => null,
-      plane: () => null,
-      sphere: () => {
-        return RAPIER.ColliderDesc.ball(geometry.radius);
-      },
-      trimesh: () => {
-        const geometry2 = options.mesh.geometry.clone();
-        geometry2.applyMatrix4(options.mesh.matrixWorld);
-        geometry2.computeVertexNormals();
-        let vertices = geometry2.attributes.position.array;
-        let indices = geometry2.index.array;
+    let shape =
+      typeof options.type == "function"
+        ? options.type(this, options)
+        : this.switch(options.type, {
+            box: () => {
+              return RAPIER.ColliderDesc.cuboid(
+                geometry.width,
+                geometry.height,
+                geometry.depth
+              );
+            },
+            capsule: () => {
+              return RAPIER.ColliderDesc.capsule(
+                geometry.length / 2,
+                geometry.radius
+              );
+            },
+            cone: () => null,
+            cylinder: () => null,
+            plane: () => null,
+            sphere: () => {
+              return RAPIER.ColliderDesc.ball(geometry.radius);
+            },
+            trimesh: () => {
+              // const geometry2 = options.mesh.geometry.clone();
+              // geometry2.applyMatrix4(options.mesh.matrixWorld);
+              // geometry2.computeVertexNormals();
+              // let vertices = geometry2.attributes.position.array;
+              // let indices = geometry2.index.array;
 
-        return RAPIER.ColliderDesc.trimesh(
-          new Float32Array(new Float32Array(vertices)),
-          new Uint32Array(new Uint32Array(indices))
-        ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-      },
-    });
+              // return RAPIER.ColliderDesc.trimesh(
+              //   new Float32Array(new Float32Array(vertices)),
+              //   new Uint32Array(new Uint32Array(indices))
+              // ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+
+              const geometry2 = options.mesh.geometry.clone();
+              geometry2.applyMatrix4(options.mesh.matrix);
+              geometry2.computeVertexNormals();
+
+              let vertices = new Float32Array(
+                geometry2.attributes.position.array
+              );
+              let indexes = new Float32Array(geometry2.index.array);
+
+              // for (let i = 1; i < vertices.length; i += 3) {
+              //   vertices[i] += 18;
+              // }
+
+              return RAPIER.ColliderDesc.trimesh(
+                vertices,
+                indexes
+              ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+            },
+          });
 
     if (!shape) {
       throw new Error(`Undefined shape "${geometry.type}"`);
@@ -529,8 +550,8 @@ export class ThreeRapierEngine {
         w: mesh.rotation.w || 1,
       },
     });
-    let shape = this.rapierShape({ type: meshType, ...options, mesh });
 
+    let shape = this.rapierShape({ type: meshType, ...options, mesh });
     return this.rapierPhysicsAdd(mesh, body, shape);
   }
 
