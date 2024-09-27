@@ -1,1 +1,0 @@
-import{_ as e}from"./CGQIBMYx.js";import{_ as n,m as a,o as _,w as r,a as s}from"./DdYu8N3N.js";const c={};function m(f,o){const t=e;return _(),a(t,{name:"main"},{default:r(()=>o[0]||(o[0]=[s("div",null,"Home",-1)])),_:1})}const d=n(c,[["render",m]]);export{d as default};
