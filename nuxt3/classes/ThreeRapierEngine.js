@@ -91,8 +91,8 @@ export class ThreeRapierEngine {
     if (this.options.debug) {
       setTimeout(() => {
         this.debug = new (class {
-          constructor(parent) {
-            this.parent = parent;
+          constructor(engine) {
+            this.engine = engine;
             this.mesh = new THREE.LineSegments(
               new THREE.BufferGeometry(),
               new THREE.LineBasicMaterial({
@@ -101,11 +101,11 @@ export class ThreeRapierEngine {
               })
             );
             this.mesh.frustumCulled = false;
-            this.parent.scene.add(this.mesh);
+            this.engine.scene.add(this.mesh);
           }
 
           update() {
-            const { vertices, colors } = this.parent.world.debugRender();
+            const { vertices, colors } = this.engine.world.debugRender();
             this.mesh.geometry.setAttribute(
               "position",
               new THREE.BufferAttribute(vertices, 3)
@@ -535,152 +535,7 @@ export class ThreeRapierEngine {
   }
 
   characterCameraControllerCreate(options = {}) {
-    return new (class {
-      constructor(parent, options) {
-        this.parent = parent;
-
-        this.options = _.merge(
-          {
-            input: {
-              forward: ["w"],
-              backward: ["s"],
-              left: ["a"],
-              right: ["d"],
-              jumb: ["Space"],
-            },
-            camera: {
-              type: "First",
-            },
-            mouse: {
-              sensitivity: 0.5,
-            },
-            player: {
-              speed: 0.06,
-              jumpForce: 0.02,
-              position: { x: 0, y: 0, z: 0 },
-              mesh: {
-                position: { x: 0, y: 0, z: 0 },
-                rotation: { x: 0, y: 0, z: 0 },
-              },
-            },
-          },
-          options
-        );
-
-        this.controller = parent.world.createCharacterController(0.01);
-        this.controller.setSlideEnabled(true); // Allow sliding down hill
-        this.controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180); // Don’t allow climbing slopes larger than 45 degrees.
-        this.controller.setMinSlopeSlideAngle((30 * Math.PI) / 180); // Automatically slide down on slopes smaller than 30 degrees.
-        this.controller.enableAutostep(0.5, 0.2, true); // (maxHeight, minWidth, includeDynamicBodies) Stair behavior
-        this.controller.enableSnapToGround(0.5); // (distance) Set ground snap behavior
-        this.controller.setApplyImpulsesToDynamicBodies(true); // Add push behavior
-        this.controller.setCharacterMass(1);
-
-        this.player = {
-          mesh: this.parent.threeMesh({
-            material: { type: "basic", color: 0xff0000 },
-            geometry: { type: "capsule", radius: 1, length: 1.7 },
-            mesh: this.options.player.mesh,
-          }),
-          body: this.parent.rapierBody({
-            type: "kinematicPositionBased",
-            position: this.options.player.mesh.position,
-            rotation: this.options.player.mesh.rotation,
-          }),
-          shape: this.parent.rapierShape({
-            type: "capsule",
-            radius: 1,
-            length: 1.7,
-          }),
-          collider: null,
-        };
-
-        this.parent.scene.add(this.player.mesh);
-
-        this.player = this.parent.rapierPhysicsAdd(
-          this.player.mesh,
-          this.player.body,
-          this.player.shape
-        );
-
-        // Player variables
-        this.player.speed = 0;
-        this.player.gravity = 0;
-        this.player.grounded = false;
-
-        this.parent.on("update", () => {
-          const { Vec3, Quat } = this.parent.helpers;
-
-          this.player.grounded = this.controller.computedGrounded();
-          this.player.gravity = this.player.grounded
-            ? 0
-            : Math.max(-9.2, this.player.gravity - 0.005);
-
-          let charDirection = Vec3();
-          let charMoveFront = Vec3();
-          let charMoveRight = Vec3();
-
-          if (this.parent.input.keyboard(this.options.input.forward)) {
-            charMoveFront.z = 1;
-          }
-
-          if (this.parent.input.keyboard(this.options.input.backward)) {
-            charMoveFront.z = -1;
-          }
-
-          if (this.parent.input.keyboard(this.options.input.left)) {
-            charMoveFront.x = 1;
-          }
-
-          if (this.parent.input.keyboard(this.options.input.right)) {
-            charMoveFront.x = -1;
-          }
-
-          if (this.parent.input.keyboard(this.options.input.jump)) {
-            if (this.player.grounded) {
-              this.player.gravity += this.options.player.jumpForce;
-            }
-          }
-
-          this.player.speed = 0;
-
-          charDirection
-            .subVectors(charMoveFront, charMoveRight)
-            .normalize()
-            .multiplyScalar(this.options.player.speed * -1);
-
-          const cameraWorldDirection = this.parent.camera.getWorldDirection(
-            new THREE.Vector3()
-          );
-
-          const cameraYaw = Math.atan2(
-            cameraWorldDirection.x,
-            cameraWorldDirection.z
-          );
-
-          charDirection
-            .applyAxisAngle(Vec3({ x: 0, y: 1, z: 0 }), cameraYaw)
-            .multiplyScalar(-1);
-
-          const charMoveDirection = {
-            x: charDirection.x,
-            y: this.player.gravity,
-            z: charDirection.z,
-          };
-
-          this.controller.computeColliderMovement(
-            this.player.collider,
-            charMoveDirection
-          );
-
-          this.player.body.setNextKinematicTranslation(
-            Vec3()
-              .copy(this.player.body.translation())
-              .add(this.controller.computedMovement())
-          );
-        });
-      }
-    })(this, options);
+    return new CharacterCameraController(this, options);
   }
 
   getOrbitControls() {
@@ -697,7 +552,7 @@ export class ThreeRapierEngine {
   }
 
   scripts = [];
-  scriptAttach(meshes, theClass) {
+  scriptAttach(theClass, meshes) {
     meshes = Array.isArray(meshes) ? meshes : [meshes];
     meshes = meshes
       .map((mesh) => {
@@ -732,8 +587,8 @@ export class ThreeRapierEngine {
 }
 
 export class ThreeRapierScript {
-  constructor(parent, mesh) {
-    this.parent = parent;
+  constructor(engine, mesh) {
+    this.engine = engine;
     this.mesh = mesh;
   }
 
@@ -742,47 +597,263 @@ export class ThreeRapierScript {
 }
 
 class ThreeRapierInput {
-  constructor(parent) {
-    this.parent = parent;
+  constructor(engine) {
+    this.engine = engine;
     this.keyboardData = {};
     this.events = [];
     this.keyboardEventsInit();
     this.events.map(({ evt, call }) => {
       document.addEventListener(evt, call);
     });
+
+    this.engine.on("update", () => {
+      for (let attr in this.keyboardData) {
+        const ev = this.keyboardData[attr];
+        if (ev.type == "keyup") delete this.keyboardData[attr];
+      }
+    });
+  }
+
+  on(evts, call) {
+    (Array.isArray(evts) ? evts : [evts]).map((evt) => {
+      this.events.push({ evt, call });
+    });
   }
 
   keyboardEventsInit() {
-    this.events.push({
-      evt: "keydown",
-      call: (ev) => {
-        this.keyboardData[ev.key] = ev;
-        this.keyboardData[ev.code] = ev;
-      },
+    this.on(["keydown", "keyup"], (ev) => {
+      this.keyboardData[ev.key] = ev;
+      this.keyboardData[ev.code] = ev;
     });
 
-    this.events.push({
-      evt: "keyup",
-      call: (ev) => {
-        if (this.keyboardData[ev.key]) {
-          delete this.keyboardData[ev.key];
-        }
-        if (this.keyboardData[ev.code]) {
-          delete this.keyboardData[ev.code];
-        }
-      },
-    });
+    // this.on("keyup", (ev) => {
+    //   if (this.keyboardData[ev.key]) {
+    //     delete this.keyboardData[ev.key];
+    //   }
+    //   if (this.keyboardData[ev.code]) {
+    //     delete this.keyboardData[ev.code];
+    //   }
+    // });
   }
 
-  keyboard(keys) {
+  keyboard(keys, types = []) {
     keys = Array.isArray(keys) ? keys : [keys];
+    types = Array.isArray(types) ? types : [types];
 
     for (let i in keys) {
       const key = keys[i];
       if (typeof this.keyboardData[key] == "undefined") return;
-      return this.keyboardData[key];
+      const ev = this.keyboardData[key];
+
+      if (types.length > 0) {
+        for (let t in types) {
+          if (ev.type == types[t]) {
+            return ev;
+          }
+        }
+        return null;
+      }
+
+      return ev;
     }
 
     return null;
+  }
+}
+
+class CharacterCameraController {
+  constructor(engine, options) {
+    this.engine = engine;
+
+    this.options = _.merge(
+      {
+        input: {
+          forward: ["w"],
+          backward: ["s"],
+          left: ["a"],
+          right: ["d"],
+          jumb: ["Space"],
+        },
+        camera: {
+          type: "first",
+        },
+        mouse: {
+          sensitivity: 0.5,
+        },
+        player: {
+          speed: 0.1,
+          jumpForce: 0.02,
+          position: { x: 0, y: 0, z: 0 },
+          mesh: {
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+          },
+        },
+      },
+      options
+    );
+
+    this.controller = engine.world.createCharacterController(0.01);
+    this.controller.setSlideEnabled(true); // Allow sliding down hill
+    this.controller.setMaxSlopeClimbAngle((45 * Math.PI) / 180); // Don’t allow climbing slopes larger than 45 degrees.
+    this.controller.setMinSlopeSlideAngle((30 * Math.PI) / 180); // Automatically slide down on slopes smaller than 30 degrees.
+    this.controller.enableAutostep(0.5, 0.2, true); // (maxHeight, minWidth, includeDynamicBodies) Stair behavior
+    this.controller.enableSnapToGround(0.5); // (distance) Set ground snap behavior
+    this.controller.setApplyImpulsesToDynamicBodies(true); // Add push behavior
+    this.controller.setCharacterMass(1);
+
+    this.player = {
+      mesh: this.engine.threeMesh({
+        material: { type: "basic", color: 0xff0000 },
+        geometry: { type: "capsule", radius: 1, length: 1.7 },
+        mesh: this.options.player.mesh,
+      }),
+      body: this.engine.rapierBody({
+        type: "kinematicPositionBased",
+        position: this.options.player.mesh.position,
+        rotation: this.options.player.mesh.rotation,
+      }),
+      shape: this.engine.rapierShape({
+        type: "capsule",
+        radius: 1,
+        length: 1.7,
+      }),
+      collider: null,
+    };
+
+    this.engine.scene.add(this.player.mesh);
+
+    this.player = this.engine.rapierPhysicsAdd(
+      this.player.mesh,
+      this.player.body,
+      this.player.shape
+    );
+
+    // Player variables
+    this.player.speed = 0;
+    this.player.gravity = 0;
+    this.player.grounded = false;
+
+    this.cameraType = this.cameraTypeSet(this.options.camera.type);
+    this.engine.on("update", () => {
+      const { Vec3, Quat } = this.engine.helpers;
+
+      this.player.grounded = this.controller.computedGrounded();
+      this.player.gravity = this.player.grounded
+        ? 0
+        : Math.max(-9.2, this.player.gravity - 0.005);
+
+      let charDirection = Vec3();
+      let charMoveFront = Vec3();
+      let charMoveRight = Vec3();
+
+      if (this.engine.input.keyboard(this.options.input.forward)) {
+        charMoveFront.z = 1;
+      }
+
+      if (this.engine.input.keyboard(this.options.input.backward)) {
+        charMoveFront.z = -1;
+      }
+
+      if (this.engine.input.keyboard(this.options.input.left)) {
+        charMoveFront.x = 1;
+      }
+
+      if (this.engine.input.keyboard(this.options.input.right)) {
+        charMoveFront.x = -1;
+      }
+
+      if (this.engine.input.keyboard(this.options.input.jump)) {
+        if (this.player.grounded) {
+          this.player.gravity += this.options.player.jumpForce;
+        }
+      }
+
+      this.player.speed = 0;
+
+      charDirection
+        .subVectors(charMoveFront, charMoveRight)
+        .normalize()
+        .multiplyScalar(this.options.player.speed * -1);
+
+      const cameraWorldDirection = this.engine.camera.getWorldDirection(
+        new THREE.Vector3()
+      );
+
+      const cameraYaw = Math.atan2(
+        cameraWorldDirection.x,
+        cameraWorldDirection.z
+      );
+
+      charDirection
+        .applyAxisAngle(Vec3({ x: 0, y: 1, z: 0 }), cameraYaw)
+        .multiplyScalar(-1);
+
+      const charMoveDirection = {
+        x: charDirection.x,
+        y: this.player.gravity,
+        z: charDirection.z,
+      };
+
+      this.controller.computeColliderMovement(
+        this.player.collider,
+        charMoveDirection
+      );
+
+      this.player.body.setNextKinematicTranslation(
+        Vec3()
+          .copy(this.player.body.translation())
+          .add(this.controller.computedMovement())
+      );
+
+      this.cameraType.onUpdate();
+    });
+  }
+
+  cameraTypes() {
+    return {
+      first: CharacterCameraControllerFirst,
+      third: CharacterCameraControllerThird,
+      fixed: CharacterCameraControllerFixed,
+    };
+  }
+
+  cameraTypeSet(mode) {
+    mode = this.cameraTypes()[mode];
+    mode = new mode(this);
+    return mode;
+  }
+}
+
+class CharacterCameraControllerFirst {
+  constructor(characterController) {
+    this.camera = characterController.engine.camera;
+    this.characterController = characterController;
+    this.onCreate();
+  }
+
+  set(type) {
+    this.characterController.cameraType =
+      this.characterController.cameraTypeSet(type);
+  }
+
+  onCreate() {
+    this.characterController.player.mesh.attach(this.camera);
+    this.camera.position.set(0, 1.7, 0);
+  }
+  onUpdate() {
+    // console.log(this.characterController.player.mesh);
+  }
+}
+
+class CharacterCameraControllerThird extends CharacterCameraControllerFirst {
+  //
+}
+
+class CharacterCameraControllerFixed extends CharacterCameraControllerFirst {
+  onCreate() {
+    this.characterController.player.mesh.attach(this.camera);
+    this.camera.position.set(0, 25, 25);
+    this.camera.rotation.set(-0.8, 0, 0);
   }
 }
