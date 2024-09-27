@@ -32,6 +32,14 @@ class Game extends ThreeRapierEngine {
 
     this.rapierPhysicsApply("Floor", "fixed", "trimesh");
     this.scriptAttach(["Cube001", "Cube002", "Cube003"], CubeScript);
+
+    this.player = this.characterCameraControllerCreate({
+      player: {
+        mesh: {
+          position: { y: 6 },
+        },
+      },
+    });
   }
 }
 

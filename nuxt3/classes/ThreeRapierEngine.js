@@ -27,6 +27,8 @@ export class ThreeRapierEngine {
     await this.threeInit();
     await this.helpersInit();
 
+    this.input = new ThreeRapierInput(this);
+
     this.busy = false;
 
     this.create();
@@ -129,7 +131,7 @@ export class ThreeRapierEngine {
     this.clock = new THREE.Clock();
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    this.renderer.gammaOutput = true;
+    // this.renderer.gammaOutput = true;
     // this.renderer.shadowMap.enabled = true;
     // this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -618,6 +620,28 @@ export class ThreeRapierEngine {
           let charMoveFront = Vec3();
           let charMoveRight = Vec3();
 
+          if (this.parent.input.keyboard(this.options.input.forward)) {
+            charMoveFront.z = 1;
+          }
+
+          if (this.parent.input.keyboard(this.options.input.backward)) {
+            charMoveFront.z = -1;
+          }
+
+          if (this.parent.input.keyboard(this.options.input.left)) {
+            charMoveFront.x = 1;
+          }
+
+          if (this.parent.input.keyboard(this.options.input.right)) {
+            charMoveFront.x = -1;
+          }
+
+          if (this.parent.input.keyboard(this.options.input.jump)) {
+            if (this.player.grounded) {
+              this.player.gravity += this.options.player.jumpForce;
+            }
+          }
+
           this.player.speed = 0;
 
           charDirection
@@ -715,4 +739,50 @@ export class ThreeRapierScript {
 
   onCreate() {}
   onUpdate() {}
+}
+
+class ThreeRapierInput {
+  constructor(parent) {
+    this.parent = parent;
+    this.keyboardData = {};
+    this.events = [];
+    this.keyboardEventsInit();
+    this.events.map(({ evt, call }) => {
+      document.addEventListener(evt, call);
+    });
+  }
+
+  keyboardEventsInit() {
+    this.events.push({
+      evt: "keydown",
+      call: (ev) => {
+        this.keyboardData[ev.key] = ev;
+        this.keyboardData[ev.code] = ev;
+      },
+    });
+
+    this.events.push({
+      evt: "keyup",
+      call: (ev) => {
+        if (this.keyboardData[ev.key]) {
+          delete this.keyboardData[ev.key];
+        }
+        if (this.keyboardData[ev.code]) {
+          delete this.keyboardData[ev.code];
+        }
+      },
+    });
+  }
+
+  keyboard(keys) {
+    keys = Array.isArray(keys) ? keys : [keys];
+
+    for (let i in keys) {
+      const key = keys[i];
+      if (typeof this.keyboardData[key] == "undefined") return;
+      return this.keyboardData[key];
+    }
+
+    return null;
+  }
 }
