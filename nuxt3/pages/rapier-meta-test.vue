@@ -20,7 +20,7 @@ class Game extends ThreeRapierEngine {
   preload() {
     return {
       scene: {
-        url: app.baseUrl("assets/threejs/models/basic/scene.gltf"),
+        url: app.baseUrl("scenes/basic/scene.gltf"),
       },
     };
   }
@@ -55,8 +55,9 @@ class CubeScript extends ThreeRapierScript {
   onCreate() {
     this.mesh.rotation.y = 1;
     this.engine.rapierPhysicsApply(this.mesh, "dynamic", "box", {
-      mass: 5,
+      mass: 100,
       restitution: 0,
+      friction: 1,
     });
   }
 }

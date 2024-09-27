@@ -764,9 +764,6 @@ class CharacterCameraController {
         }
       }
 
-      console.clear();
-      console.log(this.player.gravity);
-
       charDirection
         .subVectors(charMoveFront, charMoveRight)
         .normalize()
