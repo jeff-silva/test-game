@@ -1,1 +1,0 @@
-import{u as a}from"./ezY9ZAhu.js";const o=()=>{const t=a();return{baseUrl:(e="")=>{let s=new URL(location.href).origin;return t.app.baseURL&&(t.app.baseURL.startsWith("/")||(s+="/"),s+=t.app.baseURL,!t.app.baseURL.endsWith("/")&&!e.startsWith("/")&&(s+="/"),s+=e),s}}};export{o as u};
