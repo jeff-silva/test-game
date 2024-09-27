@@ -603,7 +603,10 @@ class ThreeRapierInput {
     this.events = [];
     this.keyboardEventsInit();
     this.events.map(({ evt, call }) => {
-      document.addEventListener(evt, call);
+      document.addEventListener(evt, (ev) => {
+        ev.preventDefault();
+        call(ev);
+      });
     });
 
     this.engine.on("update", () => {
@@ -625,15 +628,6 @@ class ThreeRapierInput {
       this.keyboardData[ev.key] = ev;
       this.keyboardData[ev.code] = ev;
     });
-
-    // this.on("keyup", (ev) => {
-    //   if (this.keyboardData[ev.key]) {
-    //     delete this.keyboardData[ev.key];
-    //   }
-    //   if (this.keyboardData[ev.code]) {
-    //     delete this.keyboardData[ev.code];
-    //   }
-    // });
   }
 
   keyboard(keys, types = []) {
@@ -672,7 +666,7 @@ class CharacterCameraController {
           backward: ["s"],
           left: ["a"],
           right: ["d"],
-          jumb: ["Space"],
+          jump: ["Space"],
         },
         camera: {
           type: "first",
@@ -681,8 +675,8 @@ class CharacterCameraController {
           sensitivity: 0.5,
         },
         player: {
-          speed: 0.1,
-          jumpForce: 0.02,
+          speed: 0.2,
+          jumpForce: 0.7,
           position: { x: 0, y: 0, z: 0 },
           mesh: {
             position: { x: 0, y: 0, z: 0 },
@@ -700,7 +694,7 @@ class CharacterCameraController {
     this.controller.enableAutostep(0.5, 0.2, true); // (maxHeight, minWidth, includeDynamicBodies) Stair behavior
     this.controller.enableSnapToGround(0.5); // (distance) Set ground snap behavior
     this.controller.setApplyImpulsesToDynamicBodies(true); // Add push behavior
-    this.controller.setCharacterMass(1);
+    this.controller.setCharacterMass(10);
 
     this.player = {
       mesh: this.engine.threeMesh({
@@ -738,10 +732,11 @@ class CharacterCameraController {
     this.engine.on("update", () => {
       const { Vec3, Quat } = this.engine.helpers;
 
+      this.player.speed = 0;
       this.player.grounded = this.controller.computedGrounded();
       this.player.gravity = this.player.grounded
         ? 0
-        : Math.max(-9.2, this.player.gravity - 0.005);
+        : Math.max(-9.2, this.player.gravity - 0.05);
 
       let charDirection = Vec3();
       let charMoveFront = Vec3();
@@ -769,7 +764,8 @@ class CharacterCameraController {
         }
       }
 
-      this.player.speed = 0;
+      console.clear();
+      console.log(this.player.gravity);
 
       charDirection
         .subVectors(charMoveFront, charMoveRight)
@@ -819,12 +815,14 @@ class CharacterCameraController {
   }
 
   cameraTypeSet(mode) {
+    this.options.camera.type = mode;
     mode = this.cameraTypes()[mode];
     mode = new mode(this);
     return mode;
   }
 }
 
+// First person view
 class CharacterCameraControllerFirst {
   constructor(characterController) {
     this.camera = characterController.engine.camera;
@@ -838,21 +836,35 @@ class CharacterCameraControllerFirst {
   }
 
   onCreate() {
-    this.characterController.player.mesh.attach(this.camera);
+    if (!this.camera.parent) {
+      this.characterController.player.mesh.attach(this.camera);
+    }
     this.camera.position.set(0, 1.7, 0);
+    this.camera.rotation.set(0, 0, 0);
   }
+
   onUpdate() {
-    // console.log(this.characterController.player.mesh);
+    //
   }
 }
 
+// Third person view
 class CharacterCameraControllerThird extends CharacterCameraControllerFirst {
-  //
+  onCreate() {
+    if (!this.camera.parent) {
+      this.characterController.player.mesh.attach(this.camera);
+    }
+    this.camera.position.set(0, 4, 10);
+    this.camera.rotation.set(-0.4, 0, 0);
+  }
 }
 
+// Vixed camera view
 class CharacterCameraControllerFixed extends CharacterCameraControllerFirst {
   onCreate() {
-    this.characterController.player.mesh.attach(this.camera);
+    if (!this.camera.parent) {
+      this.characterController.player.mesh.attach(this.camera);
+    }
     this.camera.position.set(0, 25, 25);
     this.camera.rotation.set(-0.8, 0, 0);
   }

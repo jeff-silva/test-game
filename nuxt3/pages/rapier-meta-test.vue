@@ -34,6 +34,7 @@ class Game extends ThreeRapierEngine {
     this.scriptAttach(CubeScript, ["Cube001", "Cube002", "Cube003"]);
 
     this.player = this.characterCameraControllerCreate({
+      camera: { type: "fixed" },
       player: {
         mesh: { position: { y: 6 } },
       },
@@ -41,8 +42,11 @@ class Game extends ThreeRapierEngine {
   }
 
   onUpdate() {
-    if (this.input.keyboard("q", "keyup")) {
-      console.log("aaa");
+    if (this.input.keyboard("e", "keyup")) {
+      const types = Object.keys(this.player.cameraTypes());
+      let index = 1 + types.indexOf(this.player.options.camera.type);
+      if (index >= types.length) index = 0;
+      this.player.cameraTypeSet(types[index]);
     }
   }
 }
@@ -50,7 +54,10 @@ class Game extends ThreeRapierEngine {
 class CubeScript extends ThreeRapierScript {
   onCreate() {
     this.mesh.rotation.y = 1;
-    this.engine.rapierPhysicsApply(this.mesh, "dynamic", "box");
+    this.engine.rapierPhysicsApply(this.mesh, "dynamic", "box", {
+      mass: 5,
+      restitution: 0,
+    });
   }
 }
 
