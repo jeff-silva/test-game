@@ -382,6 +382,8 @@ export class ThreeRapierEngine {
   rapierPhysicsOptions(options = {}) {
     return _.merge(
       {
+        body: "dynamic",
+        shape: "box",
         canSleep: false,
         restitution: 0.5,
         mass: 1,
@@ -389,6 +391,7 @@ export class ThreeRapierEngine {
         sensor: false,
         linvel: { x: 0, y: 0, z: 0 },
         angvel: { x: 0, y: 0, z: 0 },
+        mesh: null,
       },
       options
     );
@@ -398,27 +401,29 @@ export class ThreeRapierEngine {
     options = _.merge(
       this.rapierPhysicsOptions(),
       {
-        type: "dynamic",
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0, w: 1 },
       },
       options
     );
 
-    let rigidBodyDesc = this.switch(options.type, {
-      dynamic: () => {
-        return RAPIER.RigidBodyDesc.dynamic();
-      },
-      fixed: () => {
-        return RAPIER.RigidBodyDesc.fixed();
-      },
-      kinematicVelocityBased: () => {
-        return RAPIER.RigidBodyDesc.kinematicVelocityBased();
-      },
-      kinematicPositionBased: () => {
-        return RAPIER.RigidBodyDesc.kinematicPositionBased();
-      },
-    });
+    let rigidBodyDesc =
+      typeof options.body == "function"
+        ? options.body(this, options)
+        : this.switch(options.body, {
+            dynamic: () => {
+              return RAPIER.RigidBodyDesc.dynamic();
+            },
+            fixed: () => {
+              return RAPIER.RigidBodyDesc.fixed();
+            },
+            kinematicVelocityBased: () => {
+              return RAPIER.RigidBodyDesc.kinematicVelocityBased();
+            },
+            kinematicPositionBased: () => {
+              return RAPIER.RigidBodyDesc.kinematicPositionBased();
+            },
+          });
 
     return this.world.createRigidBody(
       rigidBodyDesc
@@ -437,14 +442,16 @@ export class ThreeRapierEngine {
   rapierShape(options) {
     options = _.merge(
       {
-        type: "box",
         geometry: { width: 1, height: 1, depth: 1, length: 1, radius: 1 },
         mesh: null,
       },
       this.rapierPhysicsOptions(options)
     );
 
-    if (options.type == "trimesh") {
+    if (
+      typeof options.shape == "string" &&
+      ["trimesh", "convexMesh"].includes(options.shape)
+    ) {
       if (!options.mesh) {
         throw new Error(`"mesh" param is required for type "trimesh"`);
       }
@@ -455,9 +462,9 @@ export class ThreeRapierEngine {
 
     const geometry = options.geometry;
     let shape =
-      typeof options.type == "function"
-        ? options.type(this, options)
-        : this.switch(options.type, {
+      typeof options.shape == "function"
+        ? options.shape(this, options)
+        : this.switch(options.shape, {
             box: () => {
               return RAPIER.ColliderDesc.cuboid(
                 geometry.width,
@@ -471,11 +478,25 @@ export class ThreeRapierEngine {
                 geometry.radius
               );
             },
-            cone: () => null,
-            cylinder: () => null,
+            // cone: () => null,
+            cylinder: () => {
+              return RAPIER.ColliderDesc.cylinder(1, 1);
+            },
             plane: () => null,
             sphere: () => {
               return RAPIER.ColliderDesc.ball(geometry.radius);
+            },
+            convexMesh: () => {
+              console.log("convexMesh", options.mesh);
+              const geometry2 = options.mesh.geometry.clone();
+              geometry2.applyMatrix4(options.mesh.matrix);
+              geometry2.computeVertexNormals();
+
+              let vertices = new Float32Array(
+                geometry2.attributes.position.array
+              );
+
+              return RAPIER.ColliderDesc.convexMesh(vertices);
             },
             trimesh: () => {
               // const geometry2 = options.mesh.geometry.clone();
@@ -497,10 +518,6 @@ export class ThreeRapierEngine {
                 geometry2.attributes.position.array
               );
               let indexes = new Float32Array(geometry2.index.array);
-
-              // for (let i = 1; i < vertices.length; i += 3) {
-              //   vertices[i] += 18;
-              // }
 
               return RAPIER.ColliderDesc.trimesh(
                 vertices,
@@ -529,14 +546,12 @@ export class ThreeRapierEngine {
     return item;
   }
 
-  rapierPhysicsApply(mesh, bodyType, meshType, options = {}) {
+  rapierPhysicsApply(mesh, options = {}) {
     mesh = this.threeGetMesh(mesh);
     if (!mesh) throw new Error("Mesh not found");
-
     options = this.rapierPhysicsOptions(options);
 
     let body = this.rapierBody({
-      type: bodyType,
       ...options,
       position: {
         x: mesh.position.x,
@@ -551,8 +566,52 @@ export class ThreeRapierEngine {
       },
     });
 
-    let shape = this.rapierShape({ type: meshType, ...options, mesh });
+    let shape = this.rapierShape({ ...options, mesh });
     return this.rapierPhysicsAdd(mesh, body, shape);
+  }
+
+  rapierCarPhysicsApply(mesh, options = {}) {
+    // mesh = this.threeGetMesh(mesh);
+    // options = _.merge(
+    //   {
+    //     wheelFL: null,
+    //     wheelFR: null,
+    //     wheelBL: null,
+    //     wheelBR: null,
+    //   },
+    //   options
+    // );
+    // let wheels = {
+    //   wheelFL: {
+    //     mesh: this.scene.getObjectByName(options.wheelFL),
+    //     body: null,
+    //     shape: null,
+    //   },
+    //   wheelFR: {
+    //     mesh: this.scene.getObjectByName(options.wheelFR),
+    //     body: null,
+    //     shape: null,
+    //   },
+    //   wheelBL: {
+    //     mesh: this.scene.getObjectByName(options.wheelBL),
+    //     body: null,
+    //     shape: null,
+    //   },
+    //   wheelBR: {
+    //     mesh: this.scene.getObjectByName(options.wheelBR),
+    //     body: null,
+    //     shape: null,
+    //   },
+    // };
+    // for (let attr in wheels) {
+    //   wheels[attr] = this.rapierPhysicsApply(
+    //     wheels[attr]["mesh"],
+    //     "dynamic",
+    //     "cylinder"
+    //   );
+    // }
+    // let car = this.rapierPhysicsApply(mesh, "dynamic", "convexMesh");
+    // console.log(wheels);
   }
 
   characterCameraControllerCreate(options = {}) {
@@ -717,32 +776,21 @@ class CharacterCameraController {
     this.controller.setApplyImpulsesToDynamicBodies(true); // Add push behavior
     this.controller.setCharacterMass(10);
 
-    this.player = {
-      mesh: this.engine.threeMesh({
-        material: { type: "basic", color: 0xff0000 },
-        geometry: { type: "capsule", radius: 1, length: 1.7 },
-        mesh: this.options.player.mesh,
-      }),
-      body: this.engine.rapierBody({
-        type: "kinematicPositionBased",
-        position: this.options.player.mesh.position,
-        rotation: this.options.player.mesh.rotation,
-      }),
-      shape: this.engine.rapierShape({
-        type: "capsule",
-        radius: 1,
-        length: 1.7,
-      }),
-      collider: null,
-    };
+    const playerMesh = this.engine.threeMesh({
+      material: { type: "basic", color: 0xff0000 },
+      geometry: { type: "capsule", radius: 1, length: 1.7 },
+      mesh: this.options.player.mesh,
+    });
 
-    this.engine.scene.add(this.player.mesh);
-
-    this.player = this.engine.rapierPhysicsAdd(
-      this.player.mesh,
-      this.player.body,
-      this.player.shape
-    );
+    this.engine.scene.add(playerMesh);
+    this.player = this.engine.rapierPhysicsApply(playerMesh, {
+      position: this.options.player.mesh.position,
+      rotation: this.options.player.mesh.rotation,
+      body: "kinematicPositionBased",
+      shape: "capsule",
+      radius: 1,
+      length: 1.7,
+    });
 
     // Player variables
     this.player.speed = 0;

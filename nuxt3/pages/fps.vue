@@ -26,11 +26,15 @@ class Game extends ThreeRapierEngine {
   }
 
   onCreate() {
-    this.scene.add(this.assets.scene.content.scene);
     // this.orbitControls = this.getOrbitControls();
+
+    this.scene.add(this.assets.scene.content.scene);
     this.camera.position.set(0, 10, 10);
 
-    this.rapierPhysicsApply("Floor", "fixed", "trimesh");
+    this.rapierPhysicsApply("Floor", {
+      body: "fixed",
+      shape: "trimesh",
+    });
     this.scriptAttach(CubeScript, ["Cube001", "Cube002", "Cube003"]);
 
     this.player = this.characterCameraControllerCreate({
@@ -53,8 +57,9 @@ class Game extends ThreeRapierEngine {
 
 class CubeScript extends ThreeRapierScript {
   onCreate() {
-    this.mesh.rotation.y = 1;
-    this.engine.rapierPhysicsApply(this.mesh, "dynamic", "box", {
+    this.engine.rapierPhysicsApply(this.mesh, {
+      body: "dynamic",
+      shape: "box",
       mass: 100,
       restitution: 0,
       friction: 1,
