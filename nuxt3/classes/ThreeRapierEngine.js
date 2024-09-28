@@ -392,20 +392,22 @@ export class ThreeRapierEngine {
         linvel: { x: 0, y: 0, z: 0 },
         angvel: { x: 0, y: 0, z: 0 },
         mesh: null,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        geometry: {
+          width: 1,
+          height: 1,
+          depth: 1,
+          length: 1,
+          radius: 1,
+        },
       },
       options
     );
   }
 
   rapierBody(options) {
-    options = _.merge(
-      this.rapierPhysicsOptions(),
-      {
-        position: { x: 0, y: 0, z: 0 },
-        rotation: { x: 0, y: 0, z: 0, w: 1 },
-      },
-      options
-    );
+    options = this.rapierPhysicsOptions(options);
 
     let rigidBodyDesc =
       typeof options.body == "function"
@@ -491,12 +493,8 @@ export class ThreeRapierEngine {
               const geometry2 = options.mesh.geometry.clone();
               geometry2.applyMatrix4(options.mesh.matrix);
               geometry2.computeVertexNormals();
-
-              let vertices = new Float32Array(
-                geometry2.attributes.position.array
-              );
-
-              return RAPIER.ColliderDesc.convexMesh(vertices);
+              let vertices = geometry2.attributes.position.array;
+              return RAPIER.ColliderDesc.convexMesh(new Float32Array(vertices));
             },
             trimesh: () => {
               // const geometry2 = options.mesh.geometry.clone();
@@ -513,15 +511,11 @@ export class ThreeRapierEngine {
               const geometry2 = options.mesh.geometry.clone();
               geometry2.applyMatrix4(options.mesh.matrix);
               geometry2.computeVertexNormals();
-
-              let vertices = new Float32Array(
-                geometry2.attributes.position.array
-              );
-              let indexes = new Float32Array(geometry2.index.array);
-
+              let vertices = geometry2.attributes.position.array;
+              let indexes = geometry2.index.array;
               return RAPIER.ColliderDesc.trimesh(
-                vertices,
-                indexes
+                newFloat32Array(vertices),
+                newFloat32Array(indexes)
               ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
             },
           });
@@ -571,47 +565,48 @@ export class ThreeRapierEngine {
   }
 
   rapierCarPhysicsApply(mesh, options = {}) {
-    // mesh = this.threeGetMesh(mesh);
-    // options = _.merge(
-    //   {
-    //     wheelFL: null,
-    //     wheelFR: null,
-    //     wheelBL: null,
-    //     wheelBR: null,
-    //   },
-    //   options
-    // );
-    // let wheels = {
-    //   wheelFL: {
-    //     mesh: this.scene.getObjectByName(options.wheelFL),
-    //     body: null,
-    //     shape: null,
-    //   },
-    //   wheelFR: {
-    //     mesh: this.scene.getObjectByName(options.wheelFR),
-    //     body: null,
-    //     shape: null,
-    //   },
-    //   wheelBL: {
-    //     mesh: this.scene.getObjectByName(options.wheelBL),
-    //     body: null,
-    //     shape: null,
-    //   },
-    //   wheelBR: {
-    //     mesh: this.scene.getObjectByName(options.wheelBR),
-    //     body: null,
-    //     shape: null,
-    //   },
-    // };
-    // for (let attr in wheels) {
-    //   wheels[attr] = this.rapierPhysicsApply(
-    //     wheels[attr]["mesh"],
-    //     "dynamic",
-    //     "cylinder"
-    //   );
-    // }
-    // let car = this.rapierPhysicsApply(mesh, "dynamic", "convexMesh");
-    // console.log(wheels);
+    mesh = this.threeGetMesh(mesh);
+    options = _.merge(
+      {
+        wheelFL: null,
+        wheelFR: null,
+        wheelBL: null,
+        wheelBR: null,
+      },
+      options
+    );
+
+    let wheels = {
+      wheelFL: {
+        mesh: this.scene.getObjectByName(options.wheelFL),
+        body: null,
+        shape: null,
+      },
+      wheelFR: {
+        mesh: this.scene.getObjectByName(options.wheelFR),
+        body: null,
+        shape: null,
+      },
+      wheelBL: {
+        mesh: this.scene.getObjectByName(options.wheelBL),
+        body: null,
+        shape: null,
+      },
+      wheelBR: {
+        mesh: this.scene.getObjectByName(options.wheelBR),
+        body: null,
+        shape: null,
+      },
+    };
+    for (let attr in wheels) {
+      wheels[attr] = this.rapierPhysicsApply(
+        wheels[attr]["mesh"],
+        "dynamic",
+        "cylinder"
+      );
+    }
+    let car = this.rapierPhysicsApply(mesh, "dynamic", "convexMesh");
+    console.log(wheels);
   }
 
   characterCameraControllerCreate(options = {}) {

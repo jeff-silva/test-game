@@ -31,40 +31,39 @@ class Game extends ThreeRapierEngine {
   onCreate() {
     this.scene.add(this.assets.scene.content.scene);
 
-    // this.rapierPhysicsApply("Plane", "fixed", (engine, options) => {
-    //   const { RAPIER } = engine;
+    this.rapierPhysicsApply("Plane", {
+      body: "fixed",
+      shape: (engine, options) => {
+        const { RAPIER } = engine;
 
-    //   const geometry = options.mesh.geometry.clone();
-    //   geometry.applyMatrix4(options.mesh.matrix);
-    //   geometry.computeVertexNormals();
+        const geometry = options.mesh.geometry.clone();
+        geometry.applyMatrix4(options.mesh.matrix);
+        geometry.computeVertexNormals();
 
-    //   let vertices = new Float32Array(geometry.attributes.position.array);
-    //   let indexes = new Float32Array(geometry.index.array);
+        let vertices = new Float32Array(geometry.attributes.position.array);
+        let indexes = new Float32Array(geometry.index.array);
 
-    //   for (let i = 1; i < vertices.length; i += 3) {
-    //     vertices[i] += 18;
-    //   }
+        for (let i = 1; i < vertices.length; i += 3) {
+          vertices[i] += 18;
+        }
 
-    //   return RAPIER.ColliderDesc.trimesh(vertices, indexes).setActiveEvents(
-    //     RAPIER.ActiveEvents.COLLISION_EVENTS
-    //   );
-    // });
+        return RAPIER.ColliderDesc.trimesh(vertices, indexes).setActiveEvents(
+          RAPIER.ActiveEvents.COLLISION_EVENTS
+        );
+      },
+    });
 
     const carMesh = this.assets.car.content.scene;
     this.scene.add(carMesh);
-    // this.rapierCarPhysicsApply(carMesh, {
-    //   wheelFL: "wheel_fl",
-    //   wheelFR: "wheel_fr",
-    //   wheelBL: "wheel_bl",
-    //   wheelBR: "wheel_br",
-    // });
+    this.rapierCarPhysicsApply(carMesh, {
+      wheelFL: "wheel_fl",
+      wheelFR: "wheel_fr",
+      wheelBL: "wheel_bl",
+      wheelBR: "wheel_br",
+    });
 
     this.orbitControls = this.getOrbitControls();
     this.camera.position.set(0, 10, 10);
-
-    // this.on("update", () => {
-    //   carMesh.position.copy(this.camera.position);
-    // });
   }
 }
 
