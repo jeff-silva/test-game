@@ -23,6 +23,24 @@ export class ThreeRapierEngine {
     this.THREE = THREE;
     this.RAPIER = RAPIER;
 
+    this.Vec3 = (x, y = 0, z = 0) => {
+      if (Array.isArray(x)) {
+        [x, y, z] = [x[0], x[1], x[2]];
+      } else if (typeof x == "object") {
+        [x, y, z] = [x.x, x.y, x.z];
+      }
+      return new THREE.Vector3(x, y, z);
+    };
+
+    this.Quat = (x, y = 0, z = 0, w = 0) => {
+      if (Array.isArray(x)) {
+        [x, y, z, w] = [x[0], x[1], x[2], x[3]];
+      } else if (typeof x == "object") {
+        [x, y, z, w] = [x.x, x.y, x.z, x.w];
+      }
+      return new THREE.Quaternion(x, y, z, w);
+    };
+
     await this.rapierInit();
     await this.threeInit();
     await this.helpersInit();
@@ -63,8 +81,8 @@ export class ThreeRapierEngine {
       script.onUpdate();
     });
 
-    for (let uuid in this.rapierPhysics) {
-      const { mesh, body, shape } = this.rapierPhysics[uuid];
+    for (let uuid in this.rapierPhysicsData) {
+      const { mesh, body, shape } = this.rapierPhysicsData[uuid];
 
       if (typeof body.translation == "function") {
         mesh.position.copy(body.translation());
@@ -427,28 +445,27 @@ export class ThreeRapierEngine {
             },
           });
 
+    // const bodyRotation = new THREE.Quaternion().setFromAxisAngle(
+    //   new Vector3(options.rotation.x, options.rotation.y, options.rotation.z),
+    //   -Math.PI / 2
+    // );
+
     return this.world.createRigidBody(
       rigidBodyDesc
+        .setCanSleep(options.canSleep)
+        .setLinvel(options.linvel.x, options.linvel.y, options.linvel.z)
+        .setAngvel(options.angvel)
+        .setRotation(options.rotation)
         .setTranslation(
           options.position.x || 0,
           options.position.y || 0,
           options.position.z || 0
         )
-        .setRotation(options.rotation)
-        .setCanSleep(options.canSleep)
-        .setLinvel(options.linvel.x, options.linvel.y, options.linvel.z)
-        .setAngvel(options.angvel)
     );
   }
 
   rapierShape(options) {
-    options = _.merge(
-      {
-        geometry: { width: 1, height: 1, depth: 1, length: 1, radius: 1 },
-        mesh: null,
-      },
-      this.rapierPhysicsOptions(options)
-    );
+    options = this.rapierPhysicsOptions(options);
 
     if (
       typeof options.shape == "string" &&
@@ -489,7 +506,6 @@ export class ThreeRapierEngine {
               return RAPIER.ColliderDesc.ball(geometry.radius);
             },
             convexMesh: () => {
-              console.log("convexMesh", options.mesh);
               const geometry2 = options.mesh.geometry.clone();
               geometry2.applyMatrix4(options.mesh.matrix);
               geometry2.computeVertexNormals();
@@ -514,8 +530,8 @@ export class ThreeRapierEngine {
               let vertices = geometry2.attributes.position.array;
               let indexes = geometry2.index.array;
               return RAPIER.ColliderDesc.trimesh(
-                newFloat32Array(vertices),
-                newFloat32Array(indexes)
+                new Float32Array(vertices),
+                new Float32Array(indexes)
               ).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
             },
           });
@@ -528,84 +544,117 @@ export class ThreeRapierEngine {
       .setMass(options.mass)
       .setRestitution(options.restitution)
       .setFriction(options.friction)
-      .setSensor(options.sensor);
+      .setSensor(options.sensor)
+      .setRotation(options.rotation)
+      .setTranslation(
+        options.position.x || 0,
+        options.position.y || 0,
+        options.position.z || 0
+      );
   }
 
-  rapierPhysics = {};
+  rapierPhysicsData = {};
   rapierPhysicsAdd(mesh, body, shape) {
     const uuid = this.uuid();
     const collider = this.world.createCollider(shape, body);
     const item = { uuid, mesh, body, shape, collider };
-    this.rapierPhysics[uuid] = item;
+    this.rapierPhysicsData[uuid] = item;
     return item;
   }
 
-  rapierPhysicsApply(mesh, options = {}) {
-    mesh = this.threeGetMesh(mesh);
-    if (!mesh) throw new Error("Mesh not found");
+  rapierPhysicsApply(options = {}) {
     options = this.rapierPhysicsOptions(options);
+    options.mesh = this.threeGetMesh(options.mesh);
 
-    let body = this.rapierBody({
-      ...options,
-      position: {
-        x: mesh.position.x,
-        y: mesh.position.y,
-        z: mesh.position.z,
-      },
-      rotation: {
-        x: mesh.rotation.x,
-        y: mesh.rotation.y,
-        z: mesh.rotation.z,
-        w: mesh.rotation.w || 1,
-      },
-    });
+    let mesh = options.mesh;
+    let body = this.rapierBody(options);
+    let shape = this.rapierShape(options);
 
-    let shape = this.rapierShape({ ...options, mesh });
     return this.rapierPhysicsAdd(mesh, body, shape);
   }
 
-  rapierCarPhysicsApply(mesh, options = {}) {
-    mesh = this.threeGetMesh(mesh);
+  rapierCarPhysicsApply(options = {}) {
     options = _.merge(
       {
+        chassi: null,
         wheelFL: null,
         wheelFR: null,
         wheelBL: null,
         wheelBR: null,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
       },
       options
     );
 
+    let chassi = { mesh: this.threeGetMesh(options.chassi) };
+    chassi.body = this.rapierBody({ body: "dynamic", mesh: chassi.mesh });
+    chassi.shape = this.rapierShape({
+      body: "convexMesh",
+      mesh: chassi.mesh,
+      geometry: { width: 2, height: 0.5 },
+      position: options.position,
+      rotation: options.rotation,
+    });
+
+    this.rapierPhysicsAdd(chassi.mesh, chassi.body, chassi.shape);
+
+    const dist1 = 10;
+    const dist2 = 10;
+    const dist3 = 2;
     let wheels = {
       wheelFL: {
-        mesh: this.scene.getObjectByName(options.wheelFL),
-        body: null,
-        shape: null,
+        mesh: this.threeGetMesh(options.wheelFL),
+        revoluteArgs: [
+          this.Vec3(-dist1, 0, -dist2),
+          this.Vec3(0, 0, 0),
+          this.Vec3(dist3, 0, 0),
+        ],
       },
       wheelFR: {
-        mesh: this.scene.getObjectByName(options.wheelFR),
-        body: null,
-        shape: null,
+        mesh: this.threeGetMesh(options.wheelFR),
+        revoluteArgs: [
+          this.Vec3(dist1, 0, -dist2),
+          this.Vec3(0, 0, 0),
+          this.Vec3(dist3, 0, 0),
+        ],
       },
       wheelBL: {
-        mesh: this.scene.getObjectByName(options.wheelBL),
-        body: null,
-        shape: null,
+        mesh: this.threeGetMesh(options.wheelBL),
+        revoluteArgs: [
+          this.Vec3(-dist1, 0, dist2),
+          this.Vec3(0, 0, 0),
+          this.Vec3(-dist3, 0, 0),
+        ],
       },
       wheelBR: {
-        mesh: this.scene.getObjectByName(options.wheelBR),
-        body: null,
-        shape: null,
+        mesh: this.threeGetMesh(options.wheelBR),
+        revoluteArgs: [
+          this.Vec3(dist1, 0, dist2),
+          this.Vec3(0, 0, 0),
+          this.Vec3(-dist3, 0, 0),
+        ],
       },
     };
-    for (let attr in wheels) {
-      wheels[attr] = this.rapierPhysicsApply(
-        wheels[attr]["mesh"],
-        "dynamic",
-        "cylinder"
-      );
+
+    for (let wheelName in wheels) {
+      let wheel = wheels[wheelName];
+
+      wheel.mesh.removeFromParent();
+      wheel.body = this.rapierBody({ body: "dynamic", mesh: wheel.mesh });
+      wheel.shape = this.rapierShape({ shape: "cylinder", mesh: wheel.mesh });
+
+      // this.world.createImpulseJoint(
+      //   this.RAPIER.JointData.revolute(...wheel.revoluteArgs),
+      //   chassi.body,
+      //   wheel.body,
+      //   true
+      // );
+
+      this.rapierPhysicsAdd(wheel.mesh, wheel.body, wheel.shape);
     }
-    let car = this.rapierPhysicsApply(mesh, "dynamic", "convexMesh");
+
+    console.log(chassi);
     console.log(wheels);
   }
 

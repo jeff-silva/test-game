@@ -29,23 +29,25 @@ class Game extends ThreeRapierEngine {
   }
 
   onCreate() {
+    this.orbitControls = this.getOrbitControls();
+    this.camera.position.set(0, 10, 10);
+
     this.scene.add(this.assets.scene.content.scene);
 
-    this.rapierPhysicsApply("Plane", {
+    this.rapierPhysicsApply({
+      mesh: "Plane",
       body: "fixed",
+      position: { x: 0, y: -20, z: 0 },
       shape: (engine, options) => {
         const { RAPIER } = engine;
 
         const geometry = options.mesh.geometry.clone();
-        geometry.applyMatrix4(options.mesh.matrix);
+        geometry.applyMatrix4(options.mesh.matrixWorld);
         geometry.computeVertexNormals();
 
         let vertices = new Float32Array(geometry.attributes.position.array);
         let indexes = new Float32Array(geometry.index.array);
-
-        for (let i = 1; i < vertices.length; i += 3) {
-          vertices[i] += 18;
-        }
+        for (let i = 1; i < vertices.length; i += 3) vertices[i] += 38;
 
         return RAPIER.ColliderDesc.trimesh(vertices, indexes).setActiveEvents(
           RAPIER.ActiveEvents.COLLISION_EVENTS
@@ -55,15 +57,26 @@ class Game extends ThreeRapierEngine {
 
     const carMesh = this.assets.car.content.scene;
     this.scene.add(carMesh);
-    this.rapierCarPhysicsApply(carMesh, {
+
+    this.rapierCarPhysicsApply({
+      chassi: carMesh,
       wheelFL: "wheel_fl",
       wheelFR: "wheel_fr",
       wheelBL: "wheel_bl",
       wheelBR: "wheel_br",
+      position: { x: 0, y: 5, z: 0 },
     });
 
-    this.orbitControls = this.getOrbitControls();
-    this.camera.position.set(0, 10, 10);
+    // this.rapierPhysicsApply({
+    //   mesh: carMesh,
+    //   body: "dynamic",
+    //   shape: "box",
+    //   geometry: {
+    //     width: 2,
+    //     height: 0.5,
+    //     depth: 1,
+    //   },
+    // });
   }
 }
 
